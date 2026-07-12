@@ -265,3 +265,15 @@ body {
     cursor: pointer;
     margin-top: 10px;
 }
+
+.trial-badge {
+    display: inline-block;
+    background-color: #17a2b8;
+    color: white;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: bold;
+    margin-left: 8px;
+    vertical-align: middle;
+}

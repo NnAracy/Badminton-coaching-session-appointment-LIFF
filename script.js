@@ -11,6 +11,7 @@ let isCoach = false;
 let currentSelectedDate = ''; // 格式 YYYY-MM-DD
 let selectedStartTime = '';   // 格式 HH:mm
 let todaysBookings = [];      // 儲存當前選定日期的所有預約，供防呆檢查
+let currentDetailBooking = null;
 
 document.addEventListener("DOMContentLoaded", () => {
     setupModalListeners();
@@ -153,6 +154,7 @@ function renderEmptyTimeGrid() {
     }
 }
 
+// 在 addBooking 函數中，綁定點擊事件
 function addBooking(booking, title, subtitle, isMine) {
     const timeId = booking.start_time.replace(':', '');
     const slot = document.getElementById(`slot-${timeId}`);
@@ -166,60 +168,105 @@ function addBooking(booking, title, subtitle, isMine) {
     const hoursText = booking.duration_mins >= 60 ? `(${booking.duration_mins / 60}h)` : '';
     block.innerHTML = `<div>${title} ${hoursText}</div>${subtitle ? `<div class="booking-info">${subtitle}</div>` : ''}`;
     
-    // 【新增】點擊色塊的事件監聽器
-    block.addEventListener('click', async (e) => {
-        e.stopPropagation(); // 阻止事件冒泡 (避免觸發底層網格的「新增預約」表單)
-        
+    // 綁定點擊開啟詳情
+    block.addEventListener('click', (e) => {
+        e.stopPropagation(); 
         if (isCoach || isMine) {
-            // 規則：已確定的預約，學員不能自己取消
-            if (booking.status === 'confirmed' && !isCoach) {
-                alert("此預約已確定，如需取消請直接聯繫教練。");
-                return;
-            }
-
-            // 跳出確認視窗
-            if (confirm(`確定要取消以下時段嗎？\n\n${title}\n時間：${booking.start_time}`)) {
-                // 呼叫 Supabase 刪除資料
-                const { error } = await supabaseClient
-                    .from('bookings')
-                    .delete()
-                    .eq('id', booking.id); // 透過資料庫獨一無二的 id 進行刪除
-
-                if (error) {
-                    alert("取消失敗，請稍後再試。");
-                    console.error(error);
-                } else {
-                    fetchAndRenderBookings(); // 刪除成功後，重新向資料庫要一次最新的課表
-                }
-            }
+            openDetailModal(booking);
         }
     });
     
     slot.appendChild(block);
 }
 
+// 渲染詳細資訊與權限判斷
+function openDetailModal(booking) {
+    currentDetailBooking = booking; 
+    
+    const contentDiv = document.getElementById("detail-content");
+    const cancelBtn = document.getElementById("detail-cancel-btn");
+    const confirmBtn = document.getElementById("detail-confirm-btn");
+
+    // 取消按鈕邏輯：學員不能取消 confirmed
+    if (booking.status === 'confirmed' && !isCoach) {
+        cancelBtn.style.display = "none"; 
+    } else {
+        cancelBtn.style.display = "block";
+    }
+
+    // 確認按鈕邏輯：只有教練且 pending 才顯示
+    if (isCoach && booking.status === 'pending') {
+        confirmBtn.style.display = "block";
+    } else {
+        confirmBtn.style.display = "none";
+    }
+
+    let trialHtml = booking.is_first_trial ? `<span class="trial-badge">首次試教</span>` : '';
+    let statusText = booking.status === 'confirmed' 
+        ? '<span style="color:#28a745;font-weight:bold;">已確定</span>' 
+        : '<span style="color:#ffc107;font-weight:bold;">待確定</span>';
+        
+    contentDiv.innerHTML = `
+        <p><strong>預約人：</strong> ${booking.user_name} ${trialHtml}</p>
+        <p><strong>狀態：</strong> ${statusText}</p>
+        <p><strong>時間：</strong> ${booking.start_time} (${booking.duration_mins} 分鐘)</p>
+        <p><strong>地點：</strong> ${booking.location}</p>
+        <p><strong>人數：</strong> ${booking.participants} 人</p>
+        <p><strong>備註：</strong> ${booking.note || '無'}</p>
+    `;
+
+    document.getElementById("detail-modal").style.display = "flex";
+}
+
+// 取消預約 API
+async function handleCancelBooking() {
+    if (confirm("確定要取消這個時段嗎？")) {
+        const { error } = await supabaseClient.from('bookings').delete().eq('id', currentDetailBooking.id);
+        if (error) {
+            alert("取消失敗，請稍後再試。");
+            console.error(error);
+        } else {
+            document.getElementById("detail-modal").style.display = "none";
+            fetchAndRenderBookings();
+        }
+    }
+}
+
+// 確定預約 API (教練專用)
+async function handleConfirmBooking() {
+    if (confirm("確定要接受這筆預約嗎？")) {
+        const { error } = await supabaseClient.from('bookings').update({ status: 'confirmed' }).eq('id', currentDetailBooking.id);
+        if (error) {
+            alert("確認失敗，請稍後再試。");
+            console.error(error);
+        } else {
+            document.getElementById("detail-modal").style.display = "none";
+            fetchAndRenderBookings();
+        }
+    }
+}
+
 // ================= Modal 與表單邏輯 =================
 
 function setupModalListeners() {
+    // 預約表單監聽
     document.getElementById("close-modal").addEventListener("click", () => {
         document.getElementById("booking-modal").style.display = "none";
     });
-
     document.getElementById("booking-form").addEventListener("submit", handleBookingSubmit);
+
+    // 詳細資訊表單監聽
+    document.getElementById("close-detail-modal").addEventListener("click", () => {
+        document.getElementById("detail-modal").style.display = "none";
+    });
+    document.getElementById("detail-cancel-btn").addEventListener("click", handleCancelBooking);
+    document.getElementById("detail-confirm-btn").addEventListener("click", handleConfirmBooking);
 }
 
 function openBookingModal(timeString) {
     selectedStartTime = timeString;
     document.getElementById("modal-time-display").textContent = `日期：${currentSelectedDate} | 時間：${timeString}`;
-    
-    // 重置表單
     document.getElementById("booking-form").reset();
-    
-    // 依據身份顯示特殊選項
-    if (isCoach) {
-        document.getElementById("coach-options").style.display = "block";
-    }
-
     document.getElementById("booking-modal").style.display = "flex";
 }
 
@@ -234,30 +281,27 @@ async function handleBookingSubmit(e) {
     e.preventDefault();
 
     const durationMins = parseInt(document.getElementById("duration-select").value);
-    const isLocked = document.getElementById("lock-checkbox")?.checked;
-    
     const newStartMins = timeToMins(selectedStartTime);
     const newEndMins = newStartMins + durationMins;
 
-    // 1. 防呆邏輯：檢查重疊 (Collision Detection)
+    // 防呆邏輯：檢查重疊
     let hasConflict = todaysBookings.some(existing => {
         let exStart = timeToMins(existing.start_time);
         let exEnd = exStart + existing.duration_mins;
-        // 兩個時間段重疊的數學條件：新開始 < 舊結束 且 新結束 > 舊開始
         return (newStartMins < exEnd) && (newEndMins > exStart);
     });
 
     if (hasConflict) {
         alert("時間段衝突，無法預約");
-        return; // 中斷，留在原方塊
+        return; 
     }
 
-    // 2. 準備寫入資料庫
+    // 寫入資料庫
     let insertData = {
         booking_date: currentSelectedDate,
         start_time: selectedStartTime,
         duration_mins: durationMins,
-        status: isLocked ? 'locked' : 'pending',
+        status: 'pending', // 預設皆為 pending
         user_line_id: currentUserProfile.userId,
         user_name: currentUserProfile.displayName,
         participants: parseInt(document.getElementById("participants-input").value),
@@ -266,23 +310,14 @@ async function handleBookingSubmit(e) {
         note: document.getElementById("note-input").value
     };
 
-    if (isLocked) {
-        // 教練鎖定時不需這些資料
-        insertData.participants = null;
-        insertData.location = null;
-    }
-
     document.getElementById("submit-booking-btn").textContent = "處理中...";
-
     const { error } = await supabaseClient.from('bookings').insert([insertData]);
-
     document.getElementById("submit-booking-btn").textContent = "送出預約";
 
     if (error) {
         console.error("預約失敗", error);
         alert("系統發生錯誤，請稍後再試。");
     } else {
-        // 預約成功：關閉 modal，重新撈取並渲染當天課表
         document.getElementById("booking-modal").style.display = "none";
         fetchAndRenderBookings();
     }

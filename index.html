@@ -55,14 +55,24 @@
                     <textarea id="note-input" rows="3" placeholder="想跟教練說什麼..."></textarea>
                 </div>
 
-                <!-- 教練專用選項 -->
-                <div id="coach-options" style="display:none; background:#F8D7DA; padding:10px; border-radius:8px; margin-bottom:15px;">
-                    <label style="color:#721C24;"><input type="checkbox" id="lock-checkbox"> 設為鎖定休息時段</label>
-                    <p style="font-size: 12px; color:#721C24; margin-top:5px;">(勾選後其他選項將失效)</p>
-                </div>
-
                 <button type="submit" id="submit-booking-btn">送出預約</button>
             </form>
+        </div>
+    </div>
+    <!-- 預約詳細資訊 彈出視窗 (Detail Modal) -->
+    <div id="detail-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close-btn" id="close-detail-modal">&times;</span>
+            <h3 id="detail-title">預約詳情</h3>
+            
+            <div id="detail-content" style="margin-top: 15px; margin-bottom: 25px; line-height: 1.8; font-size: 15px;">
+                <!-- 內容會由 JS 動態塞入 -->
+            </div>
+            
+            <div style="display: flex; gap: 10px;">
+                <button id="detail-cancel-btn" style="flex:1; background:#dc3545; color:white; padding:12px; border:none; border-radius:8px; font-size:16px; font-weight:bold; cursor:pointer;">取消預約</button>
+                <button id="detail-confirm-btn" style="flex:1; background:#007bff; color:white; padding:12px; border:none; border-radius:8px; font-size:16px; font-weight:bold; cursor:pointer; display:none;">確定預約</button>
+            </div>
         </div>
     </div>
     <!-- 頂部導航列：顯示使用者資訊 -->
