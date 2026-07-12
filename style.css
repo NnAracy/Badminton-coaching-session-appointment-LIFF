@@ -47,38 +47,74 @@ body {
     font-size: 12px;
 }
 
-/* 日期滑動選單 */
+/* ================= 日期滑動選單 ================= */
 #date-carousel {
     display: flex;
     overflow-x: auto;
     padding: 15px;
     gap: 10px;
     background-color: white;
-    /* 隱藏卷軸但保持可滑動 */
     scrollbar-width: none; 
+    align-items: center; /* 讓分隔線和按鈕垂直置中 */
 }
 #date-carousel::-webkit-scrollbar {
     display: none;
 }
 
 .date-btn {
-    flex: 0 0 auto; /* 避免按鈕被擠壓 */
+    flex: 0 0 auto;
     width: 60px;
     height: 70px;
     border-radius: 10px;
-    border: 1px solid #ddd;
+    border: 1px solid #e0e0e0;
     background: white;
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
     font-size: 14px;
+    
+    /* 預設狀態：淡化偏灰 */
+    color: #999; 
+    cursor: pointer;
+    transition: all 0.2s ease;
 }
 
+/* 懸停狀態 (Hover)：游標停留變純黑 */
+.date-btn:hover {
+    color: #000;
+    border-color: #000;
+}
+
+/* 選中狀態 (Active)：藍色填滿、白字 */
 .date-btn.active {
-    background-color: #00B900;
+    background-color: #007bff; /* 專業藍色 */
     color: white;
-    border-color: #00B900;
+    border-color: #007bff;
+}
+
+/* 月份分隔線 */
+.month-divider {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    height: 60px;
+    margin: 0 5px;
+}
+
+.month-divider span {
+    font-size: 12px;
+    font-weight: bold;
+    color: #666;
+    margin-bottom: 4px;
+}
+
+.month-divider .line {
+    width: 1px;
+    height: 100%;
+    background-color: #ccc;
 }
 
 /* ================= 時間表網格設計 ================= */
@@ -89,8 +125,9 @@ body {
 
 .time-row {
     display: flex;
+    height: 60px; /* 固定高度，方便計算跨越格數 */
     border-bottom: 1px dashed #ccc;
-    min-height: 60px; /* 每個半小時區塊的高度 */
+    box-sizing: border-box;
 }
 
 .time-label {
@@ -104,44 +141,47 @@ body {
 
 .time-slot {
     flex-grow: 1;
-    position: relative;
-    padding: 2px 5px;
-    /* 這裡可以讓使用者點擊空白處來新增預約 */
+    position: relative; /* 這是讓色塊能準確定位的關鍵 */
 }
 
 /* ================= 預約色塊設計 ================= */
 .booking-block {
+    position: absolute; /* 絕對定位於格子內 */
+    top: 0;
+    left: 0;
     width: 100%;
-    height: 100%;
+    /* 高度將由 JS 動態注入 */
+    
     border-radius: 8px;
     padding: 8px;
     font-size: 14px;
     font-weight: bold;
     display: flex;
     flex-direction: column;
-    justify-content: center;
+    justify-content: flex-start; /* 靠上對齊，因為高度可能很長 */
     cursor: pointer;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    z-index: 10; /* 確保浮在網格上方 */
+    box-sizing: border-box;
+    overflow: hidden; /* 防止文字超出版面 */
 }
 
-/* 狀態顏色 */
-.status-confirmed { background-color: #D4EDDA; color: #155724; } /* 綠色：已確定 */
-.status-pending { background-color: #FFF3CD; color: #856404; }   /* 黃色：待確定 */
-.status-completed { background-color: #E2E3E5; color: #383D41; } /* 灰色：已完成 */
-.status-locked { background-color: #F8D7DA; color: #721C24; }    /* 紅色：鎖定/休息 */
+/* 狀態顏色保持不變 */
+.status-confirmed { background-color: #D4EDDA; color: #155724; } 
+.status-pending { background-color: #FFF3CD; color: #856404; }   
+.status-completed { background-color: #E2E3E5; color: #383D41; } 
+.status-locked { background-color: #F8D7DA; color: #721C24; }    
 
-/* 【重點】我的專屬預約樣式：粗邊框 + 相對定位供圖示使用 */
+/* 我的專屬預約樣式 */
 .my-booking {
     border: 3px solid #333 !important;
-    position: relative;
 }
 
-/* 利用 CSS 偽元素在右上角加上人像圖示 */
 .my-booking::after {
     content: '👤';
     position: absolute;
-    top: 4px;
-    right: 6px;
+    top: 6px;
+    right: 8px;
     font-size: 14px;
 }
 
