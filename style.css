@@ -174,7 +174,7 @@ body {
 
 /* 我的專屬預約樣式 */
 .my-booking {
-    border: 3px solid #333 !important;
+    border: 2px solid #333 !important;
 }
 
 .my-booking::after {

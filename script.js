@@ -1,10 +1,45 @@
 const COACH_LINE_ID = "5487-777-877"; 
 const MY_LIFF_ID = "2010678137-EkdnuUi9";
 
+const SUPABASE_URL = 'https://qjthdrxrssordalufwhb.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_ck-5xYAyrCAlrqSnaPKeSQ_h2fbGmwo';
+
+const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
 document.addEventListener("DOMContentLoaded", () => {
     generateDateCarousel();
     initializeLiff(MY_LIFF_ID);
 });
+
+async function testInsertBooking() {
+    console.log("嘗試寫入資料到 Supabase...");
+    
+    const { data, error } = await supabase
+        .from('bookings')
+        .insert([
+            {
+                booking_date: '2026-07-14',
+                start_time: '08:00',
+                duration_mins: 120,
+                status: 'pending',
+                user_line_id: 'U1234567890test',
+                user_name: '測試學員A',
+                participants: 2,
+                location: '大安運動中心',
+                is_first_trial: true,
+                note: '教練好，我想練殺球'
+            }
+        ]);
+
+    if (error) {
+        console.error("寫入失敗：", error);
+    } else {
+        console.log("寫入成功！", data);
+        alert("成功連接 Supabase 並寫入一筆測試資料！");
+    }
+}
+
+setTimeout(testInsertBooking, 3000);
 
 function initializeLiff(myLiffId) {
     // 【加入本地測試模式】如果沒填真實 ID，直接模擬登入成功
