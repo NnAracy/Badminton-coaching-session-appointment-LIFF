@@ -4,7 +4,7 @@ const MY_LIFF_ID = "2010678137-EkdnuUi9";
 const SUPABASE_URL = 'https://qjthdrxrssordalufwhb.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_ck-5xYAyrCAlrqSnaPKeSQ_h2fbGmwo';
 
-const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 document.addEventListener("DOMContentLoaded", () => {
     generateDateCarousel();
@@ -15,7 +15,7 @@ document.addEventListener("DOMContentLoaded", () => {
 async function testInsertBooking() {
     console.log("嘗試寫入資料到 Supabase...");
     
-    const { data, error } = await supabase
+    const { data, error } = await supabaseClient
         .from('bookings')
         .insert([
             {
