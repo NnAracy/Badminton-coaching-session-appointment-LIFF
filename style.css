@@ -141,7 +141,13 @@ body {
 
 .time-slot {
     flex-grow: 1;
-    position: relative; /* 這是讓色塊能準確定位的關鍵 */
+    position: relative; 
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.time-slot:active {
+    background-color: #f0f0f0; 
 }
 
 /* ================= 預約色塊設計 ================= */
@@ -232,7 +238,7 @@ body {
     margin-bottom: 5px;
 }
 
-.form-group input, .form-group select, .form-group textarea {
+.form-group input:not([type="checkbox"]), .form-group select, .form-group textarea {
     width: 100%; 
     padding: 10px;
     border: 1px solid #ccc; 
@@ -241,11 +247,10 @@ body {
     font-size: 14px;
 }
 
-.checkbox-group label {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-weight: normal;
+#first-trial-checkbox {
+    width: auto;
+    transform: scale(1.2);
+    margin-right: 8px;
 }
 
 #submit-booking-btn {

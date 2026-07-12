@@ -1,4 +1,4 @@
-const COACH_LINE_ID = "5487-777-877"; 
+const COACH_LINE_ID = "Uebc116558da54785e0c7671baa01a172"; 
 const MY_LIFF_ID = "2010678137-EkdnuUi9";
 const SUPABASE_URL = 'https://qjthdrxrssordalufwhb.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_ck-5xYAyrCAlrqSnaPKeSQ_h2fbGmwo';
@@ -89,7 +89,7 @@ function generateDateCarousel() {
 
 // 核心：從資料庫撈取並渲染網格
 async function fetchAndRenderBookings() {
-    renderEmptyTimeGrid(); // 先畫出空白網格
+    renderEmptyTimeGrid(); 
     
     const { data, error } = await supabaseClient
         .from('bookings')
@@ -101,14 +101,13 @@ async function fetchAndRenderBookings() {
         return;
     }
 
-    todaysBookings = data; // 存起來供等一下防呆檢查用
+    todaysBookings = data; 
 
     data.forEach(booking => {
         let isMine = (currentUserProfile && booking.user_line_id === currentUserProfile.userId);
         let title = '';
         let subtitle = '';
 
-        // 權限與視覺邏輯
         if (booking.status === 'locked') {
             title = "教練休息時段";
         } else if (isCoach) {
@@ -119,10 +118,11 @@ async function fetchAndRenderBookings() {
             subtitle = booking.location;
         } else {
             title = booking.status === 'confirmed' ? "已被預約" : "待確定預約";
-            subtitle = booking.location; // 別人只能看到地點
+            subtitle = booking.location; 
         }
 
-        addBooking(booking.start_time.replace(':', ''), booking.status, title, subtitle, booking.duration_mins, isMine);
+        // 修改：直接傳遞整包 booking 物件
+        addBooking(booking, title, subtitle, isMine);
     });
 }
 
@@ -153,19 +153,47 @@ function renderEmptyTimeGrid() {
     }
 }
 
-function addBooking(timeId, status, title, subtitle, durationMins, isMine) {
+function addBooking(booking, title, subtitle, isMine) {
+    const timeId = booking.start_time.replace(':', '');
     const slot = document.getElementById(`slot-${timeId}`);
     if (!slot) return;
     
-    const slotsSpanned = Math.ceil(durationMins / 30);
+    const slotsSpanned = Math.ceil(booking.duration_mins / 30);
     let block = document.createElement("div");
-    block.className = `booking-block status-${status} ${isMine ? "my-booking" : ""}`;
+    block.className = `booking-block status-${booking.status} ${isMine ? "my-booking" : ""}`;
     block.style.height = `calc(${slotsSpanned * 100}% + ${slotsSpanned - 1}px)`;
     
-    const hoursText = durationMins >= 60 ? `(${durationMins / 60}h)` : '';
+    const hoursText = booking.duration_mins >= 60 ? `(${booking.duration_mins / 60}h)` : '';
     block.innerHTML = `<div>${title} ${hoursText}</div>${subtitle ? `<div class="booking-info">${subtitle}</div>` : ''}`;
     
-    // 這裡未來可以加入「點擊色塊看詳情」的監聽器
+    // 【新增】點擊色塊的事件監聽器
+    block.addEventListener('click', async (e) => {
+        e.stopPropagation(); // 阻止事件冒泡 (避免觸發底層網格的「新增預約」表單)
+        
+        if (isCoach || isMine) {
+            // 規則：已確定的預約，學員不能自己取消
+            if (booking.status === 'confirmed' && !isCoach) {
+                alert("此預約已確定，如需取消請直接聯繫教練。");
+                return;
+            }
+
+            // 跳出確認視窗
+            if (confirm(`確定要取消以下時段嗎？\n\n${title}\n時間：${booking.start_time}`)) {
+                // 呼叫 Supabase 刪除資料
+                const { error } = await supabaseClient
+                    .from('bookings')
+                    .delete()
+                    .eq('id', booking.id); // 透過資料庫獨一無二的 id 進行刪除
+
+                if (error) {
+                    alert("取消失敗，請稍後再試。");
+                    console.error(error);
+                } else {
+                    fetchAndRenderBookings(); // 刪除成功後，重新向資料庫要一次最新的課表
+                }
+            }
+        }
+    });
     
     slot.appendChild(block);
 }
