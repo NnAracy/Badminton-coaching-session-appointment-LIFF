@@ -12,6 +12,59 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
+    <!-- 預約/詳情 彈出視窗 (Modal) -->
+    <div id="booking-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close-btn" id="close-modal">&times;</span>
+            <h3 id="modal-title">預約時段</h3>
+            <p id="modal-time-display" style="color:#666; margin-bottom: 15px; font-weight: bold;"></p>
+            
+            <form id="booking-form">
+                <div class="form-group">
+                    <label>時間長度：</label>
+                    <select id="duration-select">
+                        <option value="30">30 分鐘</option>
+                        <option value="60">1 小時</option>
+                        <option value="90">1.5 小時</option>
+                        <option value="120">2 小時</option>
+                        <option value="150">2.5 小時</option>
+                        <option value="180">3 小時</option>
+                    </select>
+                </div>
+                
+                <div class="form-group" id="participants-group">
+                    <label>人數 (1~5)：</label>
+                    <input type="number" id="participants-input" min="1" max="5" value="1">
+                </div>
+                
+                <div class="form-group" id="location-group">
+                    <label>地點：</label>
+                    <select id="location-select">
+                        <option value="大安運動中心">大安運動中心</option>
+                        <option value="信義運動中心">信義運動中心</option>
+                        <option value="中正運動中心">中正運動中心</option>
+                    </select>
+                </div>
+                
+                <div class="form-group checkbox-group" id="trial-group">
+                    <label><input type="checkbox" id="first-trial-checkbox"> 首次試上</label>
+                </div>
+                
+                <div class="form-group" id="note-group">
+                    <label>備註：</label>
+                    <textarea id="note-input" rows="3" placeholder="想跟教練說什麼..."></textarea>
+                </div>
+
+                <!-- 教練專用選項 -->
+                <div id="coach-options" style="display:none; background:#F8D7DA; padding:10px; border-radius:8px; margin-bottom:15px;">
+                    <label style="color:#721C24;"><input type="checkbox" id="lock-checkbox"> 設為鎖定休息時段</label>
+                    <p style="font-size: 12px; color:#721C24; margin-top:5px;">(勾選後其他選項將失效)</p>
+                </div>
+
+                <button type="submit" id="submit-booking-btn">送出預約</button>
+            </form>
+        </div>
+    </div>
     <!-- 頂部導航列：顯示使用者資訊 -->
     <header id="app-header">
         <div class="user-info">
