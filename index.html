@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <!-- 這行確保網頁在手機上比例正確，不會縮得太小 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>羽球教練預約系統</title>
+    <link rel="stylesheet" href="style.css">
+    
+    <!-- 引入 LIFF SDK -->
+    <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+</head>
+<body>
+    <!-- 頂部導航列：顯示使用者資訊 -->
+    <header id="app-header">
+        <div class="user-info">
+            <img id="user-avatar" src="https://via.placeholder.com/40" alt="大頭貼">
+            <span id="user-name">載入中...</span>
+            <span id="role-badge" class="badge" style="display: none;">教練</span>
+        </div>
+    </header>
+
+    <!-- 日期選單 (Date Carousel) -->
+    <nav id="date-carousel">
+        <!-- 這裡會由 JavaScript 自動產生未來 14 天的按鈕 -->
+    </nav>
+
+    <!-- 時間表 (每日 08:00 - 22:00) -->
+    <main id="time-grid">
+        <p style="text-align: center; color: #666;">請先等待 LINE 身份驗證...</p>
+        <!-- 之後這裡會動態畫出 3 天的時段格 -->
+    </main>
+
+    <!-- 預約/詳情 彈出視窗 (Modal) - 先隱藏 -->
+    <div id="booking-modal" class="modal" style="display: none;">
+        <!-- 未來放表單的地方 -->
+    </div>
+
+    <!-- 引入我們的邏輯控制 -->
+    <script src="script.js"></script>
+</body>
+</html>

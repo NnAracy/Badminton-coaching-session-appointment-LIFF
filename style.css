@@ -1,0 +1,152 @@
+/* 重置預設樣式，確保跨手機瀏覽器一致 */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+body {
+    background-color: #f5f5f5;
+    color: #333;
+}
+
+/* 頂部導航：固定在最上方 */
+#app-header {
+    background-color: #ffffff;
+    padding: 15px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#user-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+#user-name {
+    font-weight: bold;
+    font-size: 16px;
+}
+
+.badge {
+    background-color: #00B900; /* LINE 綠 */
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+}
+
+/* 日期滑動選單 */
+#date-carousel {
+    display: flex;
+    overflow-x: auto;
+    padding: 15px;
+    gap: 10px;
+    background-color: white;
+    /* 隱藏卷軸但保持可滑動 */
+    scrollbar-width: none; 
+}
+#date-carousel::-webkit-scrollbar {
+    display: none;
+}
+
+.date-btn {
+    flex: 0 0 auto; /* 避免按鈕被擠壓 */
+    width: 60px;
+    height: 70px;
+    border-radius: 10px;
+    border: 1px solid #ddd;
+    background: white;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    font-size: 14px;
+}
+
+.date-btn.active {
+    background-color: #00B900;
+    color: white;
+    border-color: #00B900;
+}
+
+/* ================= 時間表網格設計 ================= */
+#time-grid {
+    padding: 10px 15px;
+    padding-bottom: 50px;
+}
+
+.time-row {
+    display: flex;
+    border-bottom: 1px dashed #ccc;
+    min-height: 60px; /* 每個半小時區塊的高度 */
+}
+
+.time-label {
+    width: 60px;
+    font-size: 13px;
+    color: #888;
+    padding-top: 10px;
+    border-right: 2px solid #ddd;
+    flex-shrink: 0;
+}
+
+.time-slot {
+    flex-grow: 1;
+    position: relative;
+    padding: 2px 5px;
+    /* 這裡可以讓使用者點擊空白處來新增預約 */
+}
+
+/* ================= 預約色塊設計 ================= */
+.booking-block {
+    width: 100%;
+    height: 100%;
+    border-radius: 8px;
+    padding: 8px;
+    font-size: 14px;
+    font-weight: bold;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+/* 狀態顏色 */
+.status-confirmed { background-color: #D4EDDA; color: #155724; } /* 綠色：已確定 */
+.status-pending { background-color: #FFF3CD; color: #856404; }   /* 黃色：待確定 */
+.status-completed { background-color: #E2E3E5; color: #383D41; } /* 灰色：已完成 */
+.status-locked { background-color: #F8D7DA; color: #721C24; }    /* 紅色：鎖定/休息 */
+
+/* 【重點】我的專屬預約樣式：粗邊框 + 相對定位供圖示使用 */
+.my-booking {
+    border: 3px solid #333 !important;
+    position: relative;
+}
+
+/* 利用 CSS 偽元素在右上角加上人像圖示 */
+.my-booking::after {
+    content: '👤';
+    position: absolute;
+    top: 4px;
+    right: 6px;
+    font-size: 14px;
+}
+
+.booking-info {
+    font-size: 12px;
+    font-weight: normal;
+    margin-top: 4px;
+}
