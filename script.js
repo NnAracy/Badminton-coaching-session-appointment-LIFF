@@ -9,6 +9,7 @@ const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 document.addEventListener("DOMContentLoaded", () => {
     generateDateCarousel();
     initializeLiff(MY_LIFF_ID);
+    setTimeout(testInsertBooking, 3000);
 });
 
 async function testInsertBooking() {
@@ -38,8 +39,6 @@ async function testInsertBooking() {
         alert("成功連接 Supabase 並寫入一筆測試資料！");
     }
 }
-
-setTimeout(testInsertBooking, 3000);
 
 function initializeLiff(myLiffId) {
     // 【加入本地測試模式】如果沒填真實 ID，直接模擬登入成功
