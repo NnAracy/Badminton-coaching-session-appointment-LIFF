@@ -207,6 +207,7 @@ function renderEmptyTimeGrid() {
 }
 
 // 在 addBooking 函數中，綁定點擊事件
+// 核心：畫出色塊，並綁定點擊邏輯
 function addBooking(booking, title, subtitle, isMine) {
     const timeId = booking.start_time.replace(':', '');
     const slot = document.getElementById(`slot-${timeId}`);
@@ -219,13 +220,20 @@ function addBooking(booking, title, subtitle, isMine) {
     
     const hoursText = (booking.duration_mins >= 60 && booking.status !== 'locked') ? `(${booking.duration_mins / 60}h)` : '';
 
-    block.innerHTML = `<div>${title} ${hoursText}</div>${subtitle ? `<div class="booking-info">${subtitle}</div>` : ''}`;
+    // 🟢 【新增】判斷是否為首次試上，並且只有教練或本人才看得到
+    let trialHtml = '';
+    if (booking.is_first_trial && (isCoach || isMine) && booking.status !== 'locked') {
+        // 使用原本的 trial-badge 類別，但稍微覆寫大小以適應小色塊
+        trialHtml = `<span class="trial-badge" style="font-size: 10px; padding: 2px 6px; margin-left: 4px;">首次試上</span>`;
+    }
+
+    // 將 trialHtml 變數加到 div 裡面
+    block.innerHTML = `<div>${title} ${hoursText} ${trialHtml}</div>${subtitle ? `<div class="booking-info">${subtitle}</div>` : ''}`;
 
     // 綁定點擊開啟詳情
     block.addEventListener('click', (e) => {
         e.stopPropagation(); 
         
-        // 【新增】如果是鎖定時段，點擊不做任何反應
         if (booking.status === 'locked') return;
 
         if (isCoach || isMine) {
