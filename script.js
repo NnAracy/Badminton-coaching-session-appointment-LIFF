@@ -1,4 +1,4 @@
-const COACH_LINE_ID = "Uebc116558da54785e0c7671baa01a172test"; 
+const COACH_LINE_ID = "Uebc116558da54785e0c7671baa01a172"; 
 const MY_LIFF_ID = "2010678137-EkdnuUi9";
 const SUPABASE_URL = 'https://qjthdrxrssordalufwhb.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_ck-5xYAyrCAlrqSnaPKeSQ_h2fbGmwo';
@@ -105,24 +105,27 @@ async function fetchAndRenderBookings() {
     todaysBookings = data; 
 
     data.forEach(booking => {
-        let isMine = (currentUserProfile && booking.user_line_id === currentUserProfile.userId);
+        // 【核心修正】加入 !isCoach 條件。
+        // 如果是教練，強制將 isMine 設為 false，徹底關閉「自己的預約」的特殊樣式與邏輯
+        let isMine = !isCoach && (currentUserProfile && booking.user_line_id === currentUserProfile.userId);
+        
         let title = '';
         let subtitle = '';
 
-        if (booking.status === 'locked') {
-            title = "教練休息時段";
-        } else if (isCoach) {
+        if (isCoach) {
+            // 教練永遠只用這個視角：看到預約者姓名與人數
             title = `${booking.user_name} (${booking.participants}人)`;
             subtitle = booking.location;
         } else if (isMine) {
+            // 一般學員看到自己的預約
             title = `我的預約 (${booking.participants}人)`;
             subtitle = booking.location;
         } else {
+            // 一般學員看到別人的預約
             title = booking.status === 'confirmed' ? "已被預約" : "待確定預約";
             subtitle = booking.location; 
         }
 
-        // 修改：直接傳遞整包 booking 物件
         addBooking(booking, title, subtitle, isMine);
     });
 }
