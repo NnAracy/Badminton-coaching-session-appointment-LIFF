@@ -125,9 +125,9 @@ body {
 .today-badge {
     position: absolute;
     bottom: 3px;
-    right: 4px;
-    font-size: 10px;
-    background-color: #dc3545; /* 醒目的紅色 */
+    right: 3px;
+    font-size: 8px;
+    background-color: #FFA500;
     color: white;
     padding: 1px 4px;
     border-radius: 4px;

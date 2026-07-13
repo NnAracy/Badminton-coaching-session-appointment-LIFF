@@ -209,7 +209,7 @@ function renderEmptyTimeGrid() {
                 
                 if (currentSelectedDate === todayString && !isCoach) {
                     // 使用我們寫好的 Custom Confirm 來顯示提示，並且只有單個「我知道了」按鈕
-                    showCustomConfirm("最早只能從明日開始預約\n如需今日預約請直接聯繫教練", "我知道了", "#dc3545");
+                    showCustomConfirm("最早只能從明日開始預約\n如需今日預約請聯繫教練", "我知道了", "#dc3545");
                     return; // 終止執行，不打開預約表單
                 }
 
@@ -417,7 +417,7 @@ async function handleBookingSubmit(e) {
     });
 
     if (hasConflict) {
-        alert("時間段衝突，無法預約");
+        showCustomConfirm("時間段衝突，無法預約", "我知道了", "#dc3545");
         return; 
     }
 
