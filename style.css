@@ -156,24 +156,24 @@ body {
 
 /* ================= 預約色塊設計 ================= */
 .booking-block {
-    position: absolute; /* 絕對定位於格子內 */
-    top: 0;
-    left: 0;
-    width: 100%;
-    /* 高度將由 JS 動態注入 */
-    
-    border-radius: 16px;
+    position: absolute; 
+    top: 3px;                 /* 上方留出 3px */
+    left: 4px;                /* 左側留出 4px */
+    width: calc(100% - 8px);  /* 總寬度減去左右共 8px 的留白 */
+
+    /* 以下保留你原本的設定 */
+    border-radius: 8px;
     padding: 8px;
     font-size: 14px;
     font-weight: bold;
     display: flex;
     flex-direction: column;
-    justify-content: flex-start; /* 靠上對齊，因為高度可能很長 */
+    justify-content: flex-start; 
     cursor: pointer;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    z-index: 10; /* 確保浮在網格上方 */
+    z-index: 10; 
     box-sizing: border-box;
-    overflow: hidden; /* 防止文字超出版面 */
+    overflow: hidden; 
 }
 
 /* 狀態顏色保持不變 */
@@ -326,7 +326,6 @@ body.edit-mode #time-grid {
     background-color: #fafafa;
     user-select: none;
     -webkit-user-select: none;
-    touch-action: none; 
 }
 
 /* 編輯模式中，原有的預約色塊變為半透明且不可點擊 (防呆) */

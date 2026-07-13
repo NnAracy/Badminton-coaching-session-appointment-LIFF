@@ -124,8 +124,8 @@ async function fetchAndRenderBookings() {
         let subtitle = '';
 
         if (booking.status === 'locked') {
-            title = "無法預約"; // 改為顯示無法預約
-            subtitle = "";     // 清空無意義的 null 資訊
+            title = "無法預約";
+            subtitle = "";
         } else if (isCoach) {
             title = `${booking.user_name} (${booking.participants}人)`;
             subtitle = booking.location;
@@ -177,7 +177,7 @@ function addBooking(booking, title, subtitle, isMine) {
     const slotsSpanned = Math.ceil(booking.duration_mins / 30);
     let block = document.createElement("div");
     block.className = `booking-block status-${booking.status} ${isMine ? "my-booking" : ""}`;
-    block.style.height = `calc(${slotsSpanned * 100}% + ${slotsSpanned - 1}px)`;
+    block.style.height = `calc(${slotsSpanned * 100}% + ${slotsSpanned - 1}px - 6px)`;
     
     const hoursText = booking.duration_mins >= 60 ? `(${booking.duration_mins / 60}h)` : '';
     block.innerHTML = `<div>${title} ${hoursText}</div>${subtitle ? `<div class="booking-info">${subtitle}</div>` : ''}`;
@@ -485,8 +485,8 @@ function initDragToSelect() {
 
         // ================= 動態變速捲動演算法 =================
         const clientY = e.clientY;
-        const threshold = 120; // 距離螢幕邊緣 120px 內開始觸發
-        const maxSpeed = 25;   // 靠最邊緣時的最大捲動速度
+        const threshold = 100; // 距離螢幕邊緣 120px 內開始觸發
+        const maxSpeed = 20;   // 靠最邊緣時的最大捲動速度
 
         if (clientY < threshold) {
             // 越靠近上方，速度越快 (負值)
