@@ -19,6 +19,10 @@ body {
     position: sticky;
     top: 0;
     z-index: 100;
+    /* 新增 Flex 屬性，把內容往兩邊推 */
+    display: flex;
+    justify-content: space-between; 
+    align-items: center;
 }
 
 .user-info {
@@ -158,7 +162,7 @@ body {
     width: 100%;
     /* 高度將由 JS 動態注入 */
     
-    border-radius: 8px;
+    border-radius: 16px;
     padding: 8px;
     font-size: 14px;
     font-weight: bold;
@@ -320,8 +324,9 @@ body {
 /* 編輯模式下的網格背景與游標提示 */
 body.edit-mode #time-grid {
     background-color: #fafafa;
-    user-select: none; /* 防止拖曳時反白文字 */
+    user-select: none;
     -webkit-user-select: none;
+    touch-action: none; 
 }
 
 /* 編輯模式中，原有的預約色塊變為半透明且不可點擊 (防呆) */

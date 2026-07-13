@@ -17,6 +17,8 @@ let isEditMode = false;
 let isDragging = false;
 let dragAction = null; // 'lock' 或 'unlock' (根據按下去的第一格決定)
 let autoScrollInterval = null;
+let scrollSpeed = 0;
+let isScrolling = false;
 
 document.addEventListener("DOMContentLoaded", () => {
     setupModalListeners();
@@ -121,18 +123,18 @@ async function fetchAndRenderBookings() {
         let title = '';
         let subtitle = '';
 
-        if (isCoach) {
-            // 教練永遠只用這個視角：看到預約者姓名與人數
+        if (booking.status === 'locked') {
+            title = "無法預約"; // 改為顯示無法預約
+            subtitle = "";     // 清空無意義的 null 資訊
+        } else if (isCoach) {
             title = `${booking.user_name} (${booking.participants}人)`;
             subtitle = booking.location;
         } else if (isMine) {
-            // 一般學員看到自己的預約
             title = `我的預約 (${booking.participants}人)`;
             subtitle = booking.location;
         } else {
-            // 一般學員看到別人的預約
             title = booking.status === 'confirmed' ? "已被預約" : "待確定預約";
-            subtitle = booking.location; 
+            subtitle = booking.location;
         }
 
         addBooking(booking, title, subtitle, isMine);
@@ -183,6 +185,10 @@ function addBooking(booking, title, subtitle, isMine) {
     // 綁定點擊開啟詳情
     block.addEventListener('click', (e) => {
         e.stopPropagation(); 
+        
+        // 【新增】如果是鎖定時段，點擊不做任何反應
+        if (booking.status === 'locked') return;
+
         if (isCoach || isMine) {
             openDetailModal(booking);
         }
@@ -388,12 +394,12 @@ function setupEditModeListeners() {
     toggleBtn.addEventListener("click", () => {
         isEditMode = !isEditMode;
         if (isEditMode) {
-            // 進入編輯模式
             document.body.classList.add("edit-mode");
             toggleBtn.textContent = "取消";
-            toggleBtn.style.backgroundColor = "#6c757d"; // 灰色
+            toggleBtn.style.backgroundColor = "#6c757d"; 
             saveBtn.style.display = "block";
-            prepareGridForPainting(); // 將舊的鎖定資料拆解成網格顏色
+            saveBtn.textContent = "保存"; // 【新增】每次進入都重置為保存
+            prepareGridForPainting();
         } else {
             // 退出編輯模式
             document.body.classList.remove("edit-mode");
@@ -434,65 +440,83 @@ function prepareGridForPainting() {
 }
 
 // ================= 3. iPhone 相簿風格：拖曳塗鴉與自動捲動 =================
+function autoScrollLoop() {
+    if (!isDragging || scrollSpeed === 0) {
+        isScrolling = false;
+        return;
+    }
+    window.scrollBy(0, scrollSpeed);
+    requestAnimationFrame(autoScrollLoop);
+}
+
 function initDragToSelect() {
     const grid = document.getElementById("time-grid");
-    // 避免重複綁定
     grid.replaceWith(grid.cloneNode(true)); 
     const newGrid = document.getElementById("time-grid");
 
-    // 處理電腦滑鼠與手機觸控
+    // 統一使用 Pointer Events (完美解決手機點按與拖曳衝突)
     const startDrag = (e) => {
         if (!isEditMode) return;
-        const target = getSlotFromEvent(e);
+        
+        // 取得當前點擊的格子
+        const target = document.elementFromPoint(e.clientX, e.clientY)?.closest('.time-slot');
         if (!target) return;
         
-        // 檢查這個格子裡面有沒有非鎖定的預約 (有的話禁止塗鴉)
         const hasBooking = Array.from(target.children).some(child => !child.classList.contains('status-locked'));
         if (hasBooking) return;
 
         isDragging = true;
-        // 根據按下去的第一格決定這次拖曳是「上色」還是「擦除」
+        // 讓瀏覽器持續追蹤這根手指，即便滑到螢幕外
+        newGrid.setPointerCapture(e.pointerId); 
+        
         dragAction = target.classList.contains('is-painting-locked') ? 'unlock' : 'lock';
         paintSlot(target);
     };
 
     const moveDrag = (e) => {
         if (!isDragging || !isEditMode) return;
-        e.preventDefault(); // 防止手機畫面預設捲動
         
-        // 1. 塗鴉邏輯
-        const target = getSlotFromEvent(e);
+        // 塗鴉邏輯
+        const target = document.elementFromPoint(e.clientX, e.clientY)?.closest('.time-slot');
         if (target) {
             const hasBooking = Array.from(target.children).some(child => !child.classList.contains('status-locked'));
             if (!hasBooking) paintSlot(target);
         }
 
-        // 2. 邊緣自動捲動邏輯
-        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-        const threshold = 100; // 距離邊緣 100px 觸發
-        
+        // ================= 動態變速捲動演算法 =================
+        const clientY = e.clientY;
+        const threshold = 120; // 距離螢幕邊緣 120px 內開始觸發
+        const maxSpeed = 25;   // 靠最邊緣時的最大捲動速度
+
         if (clientY < threshold) {
-            startAutoScroll(-10); // 向上滾動
+            // 越靠近上方，速度越快 (負值)
+            scrollSpeed = -((threshold - clientY) / threshold) * maxSpeed;
         } else if (window.innerHeight - clientY < threshold) {
-            startAutoScroll(10);  // 向下滾動
+            // 越靠近下方，速度越快 (正值)
+            scrollSpeed = ((threshold - (window.innerHeight - clientY)) / threshold) * maxSpeed;
         } else {
-            stopAutoScroll();
+            scrollSpeed = 0;
+        }
+
+        // 啟動捲動馬達
+        if (scrollSpeed !== 0 && !isScrolling) {
+            isScrolling = true;
+            requestAnimationFrame(autoScrollLoop);
         }
     };
 
-    const endDrag = () => {
+    const endDrag = (e) => {
         isDragging = false;
+        scrollSpeed = 0;
         dragAction = null;
-        stopAutoScroll();
+        newGrid.releasePointerCapture(e.pointerId);
     };
 
-    newGrid.addEventListener('mousedown', startDrag);
-    newGrid.addEventListener('mousemove', moveDrag);
-    window.addEventListener('mouseup', endDrag);
-
-    newGrid.addEventListener('touchstart', startDrag, { passive: false });
-    newGrid.addEventListener('touchmove', moveDrag, { passive: false });
-    window.addEventListener('touchend', endDrag);
+    // 綁定現代指標事件
+    newGrid.addEventListener('pointerdown', startDrag);
+    newGrid.addEventListener('pointermove', moveDrag);
+    newGrid.addEventListener('pointerup', endDrag);
+    newGrid.addEventListener('pointercancel', endDrag); // 手指滑出螢幕等意外中斷
 }
 
 // 輔助函數：取得游標所在的格子
@@ -591,5 +615,6 @@ async function handleSaveLocks() {
     }
 
     // 成功後退出編輯模式
+    document.getElementById("save-lock-btn").textContent = "保存";
     document.getElementById("toggle-edit-btn").click(); 
 }
