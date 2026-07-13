@@ -91,12 +91,14 @@ function generateDateCarousel() {
     const daysOfWeek = ["日", "一", "二", "三", "四", "五", "六"];
     let previousMonth = -1;
 
-    for (let i = 1; i <= 14; i++) {
+    // 🟢 【修改】將 1 改為 0，包含今天，總共 15 天 (0~14)
+    for (let i = 0; i <= 14; i++) {
         let futureDate = new Date(today);
         futureDate.setDate(today.getDate() + i);
 
         let dateString = `${futureDate.getFullYear()}-${String(futureDate.getMonth()+1).padStart(2,'0')}-${String(futureDate.getDate()).padStart(2,'0')}`;
-        if (i === 1) currentSelectedDate = dateString;
+        // 🟢 【修改】預設選中的日期也改為 i === 0
+        if (i === 0) currentSelectedDate = dateString;
 
         let currentMonth = futureDate.getMonth() + 1;
         let day = futureDate.getDate();
@@ -112,16 +114,18 @@ function generateDateCarousel() {
 
         let btn = document.createElement("div");
         btn.className = "date-btn";
-        if (i === 1) btn.classList.add("active"); 
+        if (i === 0) btn.classList.add("active"); // 🟢 【修改】
         
-        btn.innerHTML = `<span>${weekDay}</span><span style="font-size: 20px; font-weight: bold;">${day}</span>`;
+        // 🟢 【新增】如果是今天 (i === 0)，加上標籤
+        let todayBadge = (i === 0) ? `<div class="today-badge">今日</div>` : '';
+        
+        btn.innerHTML = `<span>${weekDay}</span><span style="font-size: 20px; font-weight: bold;">${day}</span>${todayBadge}`;
         btn.dataset.date = dateString;
 
-        // 【新增】檢查是否全日鎖定 (08:00~22:00 共 14 小時 = 840 分鐘)
+        // 檢查是否全日鎖定 (08:00~22:00 共 14 小時 = 840 分鐘)
         let isFullDayLocked = (lockedDatesMap[dateString] >= 840);
         if (isFullDayLocked) {
             btn.classList.add("full-day-locked");
-            // 💡 邏輯決定：如果是普通學員，加上 pointer-events: none 徹底禁用點擊
             if (!isCoach) {
                 btn.style.pointerEvents = "none";
             }
@@ -198,6 +202,17 @@ function renderEmptyTimeGrid() {
             let slotDiv = row.querySelector('.time-slot');
             slotDiv.addEventListener('click', (e) => {
                 if(e.target !== slotDiv) return; // 避免點到已有的色塊
+                
+                // 🟢 【新增】防呆邏輯：普通使用者不能預約今天
+                const today = new Date();
+                const todayString = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+                
+                if (currentSelectedDate === todayString && !isCoach) {
+                    // 使用我們寫好的 Custom Confirm 來顯示提示，並且只有單個「我知道了」按鈕
+                    showCustomConfirm("最早只能從明日開始預約\n如需今日預約請直接聯繫教練", "我知道了", "#dc3545");
+                    return; // 終止執行，不打開預約表單
+                }
+
                 openBookingModal(timeString);
             });
 
