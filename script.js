@@ -13,6 +13,11 @@ let selectedStartTime = '';   // 格式 HH:mm
 let todaysBookings = [];      // 儲存當前選定日期的所有預約，供防呆檢查
 let currentDetailBooking = null;
 
+let isEditMode = false;
+let isDragging = false;
+let dragAction = null; // 'lock' 或 'unlock' (根據按下去的第一格決定)
+let autoScrollInterval = null;
+
 document.addEventListener("DOMContentLoaded", () => {
     setupModalListeners();
     generateDateCarousel();
@@ -39,7 +44,11 @@ function finishLogin() {
     if (currentUserProfile.pictureUrl) document.getElementById("user-avatar").src = currentUserProfile.pictureUrl;
     if (isCoach) document.getElementById("role-badge").style.display = "inline-block";
     
-    // 登入完成後，撈取當天(第一天)的資料
+    if (isCoach) {
+        document.getElementById("role-badge").style.display = "inline-block";
+        document.getElementById("coach-edit-controls").style.display = "flex"; // 顯示編輯按鈕
+        setupEditModeListeners();
+    }
     fetchAndRenderBookings();
 }
 
@@ -369,4 +378,218 @@ async function handleBookingSubmit(e) {
         document.getElementById("booking-modal").style.display = "none";
         fetchAndRenderBookings();
     }
+}
+
+// ================= 2. 編輯模式切換邏輯 =================
+function setupEditModeListeners() {
+    const toggleBtn = document.getElementById("toggle-edit-btn");
+    const saveBtn = document.getElementById("save-lock-btn");
+
+    toggleBtn.addEventListener("click", () => {
+        isEditMode = !isEditMode;
+        if (isEditMode) {
+            // 進入編輯模式
+            document.body.classList.add("edit-mode");
+            toggleBtn.textContent = "取消";
+            toggleBtn.style.backgroundColor = "#6c757d"; // 灰色
+            saveBtn.style.display = "block";
+            prepareGridForPainting(); // 將舊的鎖定資料拆解成網格顏色
+        } else {
+            // 退出編輯模式
+            document.body.classList.remove("edit-mode");
+            toggleBtn.textContent = "鎖定時段";
+            toggleBtn.style.backgroundColor = "#dc3545"; // 紅色
+            saveBtn.style.display = "none";
+            fetchAndRenderBookings(); // 放棄修改，重新拉取原始資料
+        }
+    });
+
+    saveBtn.addEventListener("click", handleSaveLocks);
+}
+
+// 將資料庫的 locked 狀態轉換為畫布上的格子顏色
+function prepareGridForPainting() {
+    // 1. 清空所有格子的塗色
+    document.querySelectorAll('.time-slot').forEach(slot => {
+        slot.classList.remove('is-painting-locked');
+    });
+
+    // 2. 找出今天的鎖定資料，把它們拆解成 30 分鐘單位塗上顏色
+    todaysBookings.forEach(booking => {
+        if (booking.status === 'locked') {
+            let startMins = timeToMins(booking.start_time);
+            let endMins = startMins + booking.duration_mins;
+            
+            for (let m = startMins; m < endMins; m += 30) {
+                let hour = Math.floor(m / 60).toString().padStart(2, '0');
+                let min = (m % 60 === 0) ? '00' : '30';
+                let slot = document.getElementById(`slot-${hour}${min}`);
+                if (slot) slot.classList.add('is-painting-locked');
+            }
+        }
+    });
+    
+    // 初始化拖曳監聽器
+    initDragToSelect();
+}
+
+// ================= 3. iPhone 相簿風格：拖曳塗鴉與自動捲動 =================
+function initDragToSelect() {
+    const grid = document.getElementById("time-grid");
+    // 避免重複綁定
+    grid.replaceWith(grid.cloneNode(true)); 
+    const newGrid = document.getElementById("time-grid");
+
+    // 處理電腦滑鼠與手機觸控
+    const startDrag = (e) => {
+        if (!isEditMode) return;
+        const target = getSlotFromEvent(e);
+        if (!target) return;
+        
+        // 檢查這個格子裡面有沒有非鎖定的預約 (有的話禁止塗鴉)
+        const hasBooking = Array.from(target.children).some(child => !child.classList.contains('status-locked'));
+        if (hasBooking) return;
+
+        isDragging = true;
+        // 根據按下去的第一格決定這次拖曳是「上色」還是「擦除」
+        dragAction = target.classList.contains('is-painting-locked') ? 'unlock' : 'lock';
+        paintSlot(target);
+    };
+
+    const moveDrag = (e) => {
+        if (!isDragging || !isEditMode) return;
+        e.preventDefault(); // 防止手機畫面預設捲動
+        
+        // 1. 塗鴉邏輯
+        const target = getSlotFromEvent(e);
+        if (target) {
+            const hasBooking = Array.from(target.children).some(child => !child.classList.contains('status-locked'));
+            if (!hasBooking) paintSlot(target);
+        }
+
+        // 2. 邊緣自動捲動邏輯
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        const threshold = 100; // 距離邊緣 100px 觸發
+        
+        if (clientY < threshold) {
+            startAutoScroll(-10); // 向上滾動
+        } else if (window.innerHeight - clientY < threshold) {
+            startAutoScroll(10);  // 向下滾動
+        } else {
+            stopAutoScroll();
+        }
+    };
+
+    const endDrag = () => {
+        isDragging = false;
+        dragAction = null;
+        stopAutoScroll();
+    };
+
+    newGrid.addEventListener('mousedown', startDrag);
+    newGrid.addEventListener('mousemove', moveDrag);
+    window.addEventListener('mouseup', endDrag);
+
+    newGrid.addEventListener('touchstart', startDrag, { passive: false });
+    newGrid.addEventListener('touchmove', moveDrag, { passive: false });
+    window.addEventListener('touchend', endDrag);
+}
+
+// 輔助函數：取得游標所在的格子
+function getSlotFromEvent(e) {
+    let clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    let clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    let element = document.elementFromPoint(clientX, clientY);
+    return element ? element.closest('.time-slot') : null;
+}
+
+// 輔助函數：上色或擦除
+function paintSlot(slot) {
+    if (dragAction === 'lock') {
+        slot.classList.add('is-painting-locked');
+    } else if (dragAction === 'unlock') {
+        slot.classList.remove('is-painting-locked');
+    }
+}
+
+// 輔助函數：平滑自動捲動
+function startAutoScroll(amount) {
+    if (autoScrollInterval) return;
+    autoScrollInterval = setInterval(() => {
+        window.scrollBy(0, amount);
+    }, 20); // 速度控制
+}
+function stopAutoScroll() {
+    if (autoScrollInterval) {
+        clearInterval(autoScrollInterval);
+        autoScrollInterval = null;
+    }
+}
+
+// ================= 4. 保存與重建邏輯 (Delete-and-Recreate) =================
+async function handleSaveLocks() {
+    const isConfirmed = await showCustomConfirm("確定要保存目前的鎖定時段嗎？", "確定保存", "#007bff");
+    if (!isConfirmed) return;
+
+    document.getElementById("save-lock-btn").textContent = "保存中...";
+
+    // 1. 掃描畫面上所有被塗色的格子，合併成連續的時間段
+    let newLocks = [];
+    let currentLock = null;
+
+    document.querySelectorAll('.time-slot').forEach(slot => {
+        let isLocked = slot.classList.contains('is-painting-locked');
+        let timeId = slot.id.replace('slot-', ''); // e.g. "0830"
+        let timeStr = `${timeId.substring(0,2)}:${timeId.substring(2,4)}`;
+        let currentMins = timeToMins(timeStr);
+
+        if (isLocked) {
+            if (!currentLock) {
+                // 開啟一個新的連續區段
+                currentLock = { start_time: timeStr, duration_mins: 30 };
+            } else {
+                // 延續上一個區段
+                currentLock.duration_mins += 30;
+            }
+        } else {
+            if (currentLock) {
+                // 區段結束，存入陣列
+                newLocks.push(currentLock);
+                currentLock = null;
+            }
+        }
+    });
+    // 處理最後一個卡在 22:00 結束的區段
+    if (currentLock) newLocks.push(currentLock);
+
+    // 2. 刪除該日舊有的所有臨時鎖定資料
+    const { error: deleteError } = await supabaseClient
+        .from('bookings')
+        .delete()
+        .eq('booking_date', currentSelectedDate)
+        .eq('status', 'locked');
+
+    if (deleteError) {
+        alert("保存失敗：清除舊資料錯誤");
+        return;
+    }
+
+    // 3. 寫入新的連續鎖定資料
+    if (newLocks.length > 0) {
+        const insertData = newLocks.map(lock => ({
+            booking_date: currentSelectedDate,
+            start_time: lock.start_time,
+            duration_mins: lock.duration_mins,
+            status: 'locked'
+        }));
+
+        const { error: insertError } = await supabaseClient.from('bookings').insert(insertData);
+        if (insertError) {
+            alert("保存失敗：寫入新資料錯誤");
+            return;
+        }
+    }
+
+    // 成功後退出編輯模式
+    document.getElementById("toggle-edit-btn").click(); 
 }

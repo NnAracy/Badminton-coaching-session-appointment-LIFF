@@ -315,3 +315,60 @@ body {
     background-color: #e0e0e0;
     color: #333;
 }
+
+/* ================= 編輯鎖定模式 (Edit Mode) ================= */
+/* 編輯模式下的網格背景與游標提示 */
+body.edit-mode #time-grid {
+    background-color: #fafafa;
+    user-select: none; /* 防止拖曳時反白文字 */
+    -webkit-user-select: none;
+}
+
+/* 編輯模式中，原有的預約色塊變為半透明且不可點擊 (防呆) */
+body.edit-mode .booking-block:not(.status-locked) {
+    opacity: 0.4;
+    pointer-events: none;
+    background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(0,0,0,0.05) 10px, rgba(0,0,0,0.05) 20px);
+}
+
+/* 隱藏編輯模式下原本渲染的浮動鎖定方塊 */
+body.edit-mode .booking-block.status-locked {
+    display: none; 
+}
+
+/* 將 30 分鐘的底層網格變成「可塗色」的畫布 */
+.time-slot {
+    transition: background-color 0.1s;
+}
+
+/* 塗上鎖定顏色的網格 */
+.time-slot.is-painting-locked {
+    background-color: #F8D7DA; /* 鎖定紅色 */
+    border-top: 1px solid #f5c6cb;
+    border-bottom: 1px solid #f5c6cb;
+}
+
+/* 正在拖曳選取中，尚未放開手指的半透明預覽 */
+.time-slot.is-preview-locked {
+    background-color: rgba(248, 215, 218, 0.6);
+}
+
+/* ================= 日期整日鎖定 (打叉特效) ================= */
+.date-btn.full-day-locked {
+    background-color: #e9ecef;
+    color: #adb5bd;
+    border-color: #ced4da;
+    position: relative;
+    overflow: hidden;
+}
+/* 用偽元素畫一個大叉叉 */
+.date-btn.full-day-locked::after,
+.date-btn.full-day-locked::before {
+    content: '';
+    position: absolute;
+    top: 50%; left: 5%;
+    width: 90%; height: 2px;
+    background-color: rgba(220, 53, 69, 0.5);
+}
+.date-btn.full-day-locked::after { transform: rotate(45deg); }
+.date-btn.full-day-locked::before { transform: rotate(-45deg); }
