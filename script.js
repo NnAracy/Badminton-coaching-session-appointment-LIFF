@@ -221,9 +221,51 @@ function openDetailModal(booking) {
     document.getElementById("detail-modal").style.display = "flex";
 }
 
-// 取消預約 API
+// ================= 新增：自訂確認對話框的非同步函數 =================
+function showCustomConfirm(message, okButtonText = "確定", okButtonColor = "#dc3545") {
+    return new Promise((resolve) => {
+        const modal = document.getElementById("custom-confirm-modal");
+        const okBtn = document.getElementById("custom-btn-ok");
+        const cancelBtn = document.getElementById("custom-btn-cancel");
+
+        // 設定文字與按鈕顏色
+        document.getElementById("custom-confirm-message").textContent = message;
+        okBtn.textContent = okButtonText;
+        okBtn.style.backgroundColor = okButtonColor;
+
+        modal.style.display = "flex";
+
+        // 點擊取消
+        const onCancel = () => {
+            modal.style.display = "none";
+            cleanup();
+            resolve(false); // 回傳 false
+        };
+
+        // 點擊確定
+        const onOk = () => {
+            modal.style.display = "none";
+            cleanup();
+            resolve(true); // 回傳 true
+        };
+
+        // 避免重複綁定事件
+        const cleanup = () => {
+            cancelBtn.removeEventListener("click", onCancel);
+            okBtn.removeEventListener("click", onOk);
+        };
+
+        cancelBtn.addEventListener("click", onCancel);
+        okBtn.addEventListener("click", onOk);
+    });
+}
+
+// ================= 更新：取消預約 API =================
 async function handleCancelBooking() {
-    if (confirm("確定要取消這個時段嗎？")) {
+    // 呼叫自訂視窗，並等待使用者點擊（取代原本的 window.confirm）
+    const isConfirmed = await showCustomConfirm("確定要取消這個時段嗎？\n此動作無法復原。", "確定取消", "#dc3545");
+    
+    if (isConfirmed) {
         const { error } = await supabaseClient.from('bookings').delete().eq('id', currentDetailBooking.id);
         if (error) {
             alert("取消失敗，請稍後再試。");
@@ -235,9 +277,12 @@ async function handleCancelBooking() {
     }
 }
 
-// 確定預約 API (教練專用)
+// ================= 更新：確定預約 API (教練專用) =================
 async function handleConfirmBooking() {
-    if (confirm("確定要接受這筆預約嗎？")) {
+    // 教練確認預約時，按鈕改用藍色
+    const isConfirmed = await showCustomConfirm(`確定要接受「${currentDetailBooking.user_name}」的預約嗎？`, "確定接受", "#007bff");
+    
+    if (isConfirmed) {
         const { error } = await supabaseClient.from('bookings').update({ status: 'confirmed' }).eq('id', currentDetailBooking.id);
         if (error) {
             alert("確認失敗，請稍後再試。");

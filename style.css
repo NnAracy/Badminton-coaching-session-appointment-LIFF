@@ -277,3 +277,41 @@ body {
     margin-left: 8px;
     vertical-align: middle;
 }
+
+/* Confirm Modal */
+#custom-confirm-modal {
+    z-index: 2000; /* 確保它浮在所有彈窗的最上層 */
+}
+
+#custom-confirm-modal .modal-content {
+    max-width: 320px;
+    text-align: center;
+    padding: 25px 20px;
+}
+
+#custom-confirm-message {
+    margin: 15px 0 25px;
+    font-size: 16px;
+    color: #444;
+    line-height: 1.5;
+}
+
+.confirm-btn-group {
+    display: flex;
+    gap: 10px;
+}
+
+.confirm-btn {
+    flex: 1;
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+#custom-btn-cancel {
+    background-color: #e0e0e0;
+    color: #333;
+}
