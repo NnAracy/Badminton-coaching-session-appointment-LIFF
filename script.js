@@ -12,6 +12,7 @@ let currentSelectedDate = ''; // 格式 YYYY-MM-DD
 let selectedStartTime = '';   // 格式 HH:mm
 let todaysBookings = [];      // 儲存當前選定日期的所有預約，供防呆檢查
 let currentDetailBooking = null;
+let lockedDatesMap = {};
 
 let isEditMode = false;
 let isDragging = false;
@@ -40,18 +41,47 @@ function initializeLiff(myLiffId) {
         }).catch(err => console.error(err));
 }
 
-function finishLogin() {
+// ================= 重構登入後的初始化流程 =================
+async function finishLogin() {
     isCoach = (currentUserProfile.userId === COACH_LINE_ID);
     document.getElementById("user-name").textContent = currentUserProfile.displayName;
     if (currentUserProfile.pictureUrl) document.getElementById("user-avatar").src = currentUserProfile.pictureUrl;
-    if (isCoach) document.getElementById("role-badge").style.display = "inline-block";
     
     if (isCoach) {
         document.getElementById("role-badge").style.display = "inline-block";
-        document.getElementById("coach-edit-controls").style.display = "flex"; // 顯示編輯按鈕
+        document.getElementById("coach-edit-controls").style.display = "flex";
         setupEditModeListeners();
     }
+    
+    // 【重大架構改變】先撈取 14 天鎖定狀況 -> 畫出日期選單 -> 撈取當天詳細課表
+    await fetchFourteenDaysLocks(); 
+    generateDateCarousel();
     fetchAndRenderBookings();
+}
+
+// 預先撈取未來 14 天的鎖定資料
+async function fetchFourteenDaysLocks() {
+    const today = new Date();
+    const endDate = new Date(today);
+    endDate.setDate(today.getDate() + 14);
+
+    const startStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+    const endStr = `${endDate.getFullYear()}-${String(endDate.getMonth()+1).padStart(2,'0')}-${String(endDate.getDate()).padStart(2,'0')}`;
+
+    const { data, error } = await supabaseClient
+        .from('bookings')
+        .select('booking_date, duration_mins')
+        .eq('status', 'locked')
+        .gte('booking_date', startStr)
+        .lte('booking_date', endStr);
+
+    lockedDatesMap = {}; // 清空重算
+    if (!error && data) {
+        data.forEach(lock => {
+            if (!lockedDatesMap[lock.booking_date]) lockedDatesMap[lock.booking_date] = 0;
+            lockedDatesMap[lock.booking_date] += lock.duration_mins;
+        });
+    }
 }
 
 function generateDateCarousel() {
@@ -65,10 +95,8 @@ function generateDateCarousel() {
         let futureDate = new Date(today);
         futureDate.setDate(today.getDate() + i);
 
-        // 產生 YYYY-MM-DD 字串供資料庫使用
         let dateString = `${futureDate.getFullYear()}-${String(futureDate.getMonth()+1).padStart(2,'0')}-${String(futureDate.getDate()).padStart(2,'0')}`;
-        
-        if (i === 1) currentSelectedDate = dateString; // 預設選中明天
+        if (i === 1) currentSelectedDate = dateString;
 
         let currentMonth = futureDate.getMonth() + 1;
         let day = futureDate.getDate();
@@ -89,11 +117,21 @@ function generateDateCarousel() {
         btn.innerHTML = `<span>${weekDay}</span><span style="font-size: 20px; font-weight: bold;">${day}</span>`;
         btn.dataset.date = dateString;
 
+        // 【新增】檢查是否全日鎖定 (08:00~22:00 共 14 小時 = 840 分鐘)
+        let isFullDayLocked = (lockedDatesMap[dateString] >= 840);
+        if (isFullDayLocked) {
+            btn.classList.add("full-day-locked");
+            // 💡 邏輯決定：如果是普通學員，加上 pointer-events: none 徹底禁用點擊
+            if (!isCoach) {
+                btn.style.pointerEvents = "none";
+            }
+        }
+
         btn.addEventListener('click', () => {
             document.querySelectorAll('.date-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             currentSelectedDate = btn.dataset.date;
-            fetchAndRenderBookings(); // 切換日期重新撈資料
+            fetchAndRenderBookings(); 
         });
         carousel.appendChild(btn);
     }
@@ -179,9 +217,8 @@ function addBooking(booking, title, subtitle, isMine) {
     block.className = `booking-block status-${booking.status} ${isMine ? "my-booking" : ""}`;
     block.style.height = `calc(${slotsSpanned * 100}% + ${slotsSpanned - 1}px - 6px)`;
     
-    const hoursText = booking.duration_mins >= 60 ? `(${booking.duration_mins / 60}h)` : '';
-    block.innerHTML = `<div>${title} ${hoursText}</div>${subtitle ? `<div class="booking-info">${subtitle}</div>` : ''}`;
-    
+    const hoursText = (booking.duration_mins >= 60 && booking.status !== 'locked') ? `(${booking.duration_mins / 60}h)` : '';
+
     // 綁定點擊開啟詳情
     block.addEventListener('click', (e) => {
         e.stopPropagation(); 
@@ -390,6 +427,7 @@ async function handleBookingSubmit(e) {
 function setupEditModeListeners() {
     const toggleBtn = document.getElementById("toggle-edit-btn");
     const saveBtn = document.getElementById("save-lock-btn");
+    const selectAllBtn = document.getElementById("select-all-btn");
 
     toggleBtn.addEventListener("click", () => {
         isEditMode = !isEditMode;
@@ -398,19 +436,58 @@ function setupEditModeListeners() {
             toggleBtn.textContent = "取消";
             toggleBtn.style.backgroundColor = "#6c757d"; 
             saveBtn.style.display = "block";
-            saveBtn.textContent = "保存"; // 【新增】每次進入都重置為保存
+            saveBtn.textContent = "保存"; 
+            selectAllBtn.style.display = "block"; // 顯示全選按鈕
             prepareGridForPainting();
         } else {
-            // 退出編輯模式
             document.body.classList.remove("edit-mode");
             toggleBtn.textContent = "鎖定時段";
-            toggleBtn.style.backgroundColor = "#dc3545"; // 紅色
+            toggleBtn.style.backgroundColor = "#dc3545"; 
             saveBtn.style.display = "none";
-            fetchAndRenderBookings(); // 放棄修改，重新拉取原始資料
+            selectAllBtn.style.display = "none"; // 隱藏全選按鈕
+            fetchAndRenderBookings(); 
         }
     });
 
     saveBtn.addEventListener("click", handleSaveLocks);
+
+    // 【新增】全選 / 取消全選邏輯
+    selectAllBtn.addEventListener("click", () => {
+        const allSlots = document.querySelectorAll('.time-slot');
+        
+        if (selectAllBtn.textContent === "全選") {
+            // 防呆細節一：檢查是否有已存在的非鎖定預約
+            const hasBooking = todaysBookings.some(b => b.status !== 'locked');
+            if (hasBooking) {
+                showCustomConfirm("該日已有預約，無法全選鎖定", "我知道了", "#dc3545");
+                return;
+            }
+            // 執行全選
+            allSlots.forEach(slot => slot.classList.add('is-painting-locked'));
+        } else {
+            // 執行取消全選
+            allSlots.forEach(slot => slot.classList.remove('is-painting-locked'));
+        }
+        updateSelectAllBtnState(); // 更新按鈕文字
+    });
+}
+
+// 【新增】動態判斷全選按鈕要顯示什麼文字
+function updateSelectAllBtnState() {
+    if (!isEditMode) return;
+    const allSlots = document.querySelectorAll('.time-slot');
+    const paintedSlots = document.querySelectorAll('.time-slot.is-painting-locked');
+    const selectAllBtn = document.getElementById('select-all-btn');
+
+    if (paintedSlots.length === allSlots.length && allSlots.length > 0) {
+        selectAllBtn.textContent = "取消全選";
+        selectAllBtn.style.backgroundColor = "#ffc107"; // 變成警告黃色
+        selectAllBtn.style.color = "#000";
+    } else {
+        selectAllBtn.textContent = "全選";
+        selectAllBtn.style.backgroundColor = "#17a2b8"; // 變回資訊藍色
+        selectAllBtn.style.color = "#fff";
+    }
 }
 
 // 將資料庫的 locked 狀態轉換為畫布上的格子顏色
@@ -437,6 +514,7 @@ function prepareGridForPainting() {
     
     // 初始化拖曳監聽器
     initDragToSelect();
+    updateSelectAllBtnState();
 }
 
 // ================= 3. iPhone 相簿風格：拖曳塗鴉與自動捲動 =================
@@ -485,8 +563,8 @@ function initDragToSelect() {
 
         // ================= 動態變速捲動演算法 =================
         const clientY = e.clientY;
-        const threshold = 100; // 距離螢幕邊緣 120px 內開始觸發
-        const maxSpeed = 20;   // 靠最邊緣時的最大捲動速度
+        const threshold = 80;
+        const maxSpeed = 12;
 
         if (clientY < threshold) {
             // 越靠近上方，速度越快 (負值)
@@ -510,6 +588,8 @@ function initDragToSelect() {
         scrollSpeed = 0;
         dragAction = null;
         newGrid.releasePointerCapture(e.pointerId);
+        
+        updateSelectAllBtnState(); // 【新增】手指放開時，檢查是否已經全滿
     };
 
     // 綁定現代指標事件
@@ -617,4 +697,7 @@ async function handleSaveLocks() {
     // 成功後退出編輯模式
     document.getElementById("save-lock-btn").textContent = "保存";
     document.getElementById("toggle-edit-btn").click(); 
+
+    await fetchFourteenDaysLocks();
+    generateDateCarousel();
 }
