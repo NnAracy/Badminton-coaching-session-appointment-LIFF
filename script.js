@@ -20,6 +20,8 @@ let dragAction = null; // 'lock' 或 'unlock' (根據按下去的第一格決定
 let autoScrollInterval = null;
 let scrollSpeed = 0;
 let isScrolling = false;
+let draftLocksMap = {};
+let editedDates = new Set();
 
 document.addEventListener("DOMContentLoaded", () => {
     setupModalListeners();
@@ -91,14 +93,16 @@ function generateDateCarousel() {
     const daysOfWeek = ["日", "一", "二", "三", "四", "五", "六"];
     let previousMonth = -1;
 
-    // 🟢 【修改】將 1 改為 0，包含今天，總共 15 天 (0~14)
+    // 🟢 【修正 1】判斷是否為初次載入，如果是，才把今天設為預設；否則保留教練當下的選擇
+    let isFirstLoad = !currentSelectedDate;
+
     for (let i = 0; i <= 14; i++) {
         let futureDate = new Date(today);
         futureDate.setDate(today.getDate() + i);
 
         let dateString = `${futureDate.getFullYear()}-${String(futureDate.getMonth()+1).padStart(2,'0')}-${String(futureDate.getDate()).padStart(2,'0')}`;
-        // 🟢 【修改】預設選中的日期也改為 i === 0
-        if (i === 0) currentSelectedDate = dateString;
+        
+        if (isFirstLoad && i === 0) currentSelectedDate = dateString;
 
         let currentMonth = futureDate.getMonth() + 1;
         let day = futureDate.getDate();
@@ -114,24 +118,22 @@ function generateDateCarousel() {
 
         let btn = document.createElement("div");
         btn.className = "date-btn";
-        if (i === 0) btn.classList.add("active"); // 🟢 【修改】
+        if (dateString === currentSelectedDate) btn.classList.add("active"); 
         
-        // 🟢 【新增】如果是今天 (i === 0)，加上標籤
         let todayBadge = (i === 0) ? `<div class="today-badge">今日</div>` : '';
-        
         btn.innerHTML = `<span>${weekDay}</span><span style="font-size: 20px; font-weight: bold;">${day}</span>${todayBadge}`;
         btn.dataset.date = dateString;
 
-        // 檢查是否全日鎖定 (08:00~22:00 共 14 小時 = 840 分鐘)
         let isFullDayLocked = (lockedDatesMap[dateString] >= 840);
         if (isFullDayLocked) {
             btn.classList.add("full-day-locked");
-            if (!isCoach) {
-                btn.style.pointerEvents = "none";
-            }
+            if (!isCoach) btn.style.pointerEvents = "none";
         }
 
         btn.addEventListener('click', () => {
+            // 🟢 【修正 3-支援】在切換日期前，把目前這天的塗鴉存進記憶體
+            if (isEditMode) saveCurrentGridToDraft();
+
             document.querySelectorAll('.date-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             currentSelectedDate = btn.dataset.date;
@@ -181,6 +183,10 @@ async function fetchAndRenderBookings() {
 
         addBooking(booking, title, subtitle, isMine);
     });
+
+    if (isEditMode) {
+        prepareGridForPainting();
+    }
 }
 
 function renderEmptyTimeGrid() {
@@ -456,6 +462,8 @@ function setupEditModeListeners() {
 
     toggleBtn.addEventListener("click", () => {
         isEditMode = !isEditMode;
+        draftLocksMap = {};
+        editedDates.clear();
         if (isEditMode) {
             document.body.classList.add("edit-mode");
             toggleBtn.textContent = "取消";
@@ -516,28 +524,34 @@ function updateSelectAllBtnState() {
 }
 
 // 將資料庫的 locked 狀態轉換為畫布上的格子顏色
+// 將資料庫的 locked 狀態轉換為畫布上的格子顏色
 function prepareGridForPainting() {
-    // 1. 清空所有格子的塗色
     document.querySelectorAll('.time-slot').forEach(slot => {
         slot.classList.remove('is-painting-locked');
     });
 
-    // 2. 找出今天的鎖定資料，把它們拆解成 30 分鐘單位塗上顏色
-    todaysBookings.forEach(booking => {
-        if (booking.status === 'locked') {
-            let startMins = timeToMins(booking.start_time);
-            let endMins = startMins + booking.duration_mins;
-            
-            for (let m = startMins; m < endMins; m += 30) {
-                let hour = Math.floor(m / 60).toString().padStart(2, '0');
-                let min = (m % 60 === 0) ? '00' : '30';
-                let slot = document.getElementById(`slot-${hour}${min}`);
-                if (slot) slot.classList.add('is-painting-locked');
+    // 🟢 【修正 3-支援】優先從「暫存草稿」恢復，如果這天還沒被編輯過，才讀取資料庫
+    if (editedDates.has(currentSelectedDate)) {
+        let savedSlots = draftLocksMap[currentSelectedDate] || [];
+        savedSlots.forEach(timeId => {
+            let slot = document.getElementById(`slot-${timeId}`);
+            if (slot) slot.classList.add('is-painting-locked');
+        });
+    } else {
+        todaysBookings.forEach(booking => {
+            if (booking.status === 'locked') {
+                let startMins = timeToMins(booking.start_time);
+                let endMins = startMins + booking.duration_mins;
+                for (let m = startMins; m < endMins; m += 30) {
+                    let hour = Math.floor(m / 60).toString().padStart(2, '0');
+                    let min = (m % 60 === 0) ? '00' : '30';
+                    let slot = document.getElementById(`slot-${hour}${min}`);
+                    if (slot) slot.classList.add('is-painting-locked');
+                }
             }
-        }
-    });
+        });
+    }
     
-    // 初始化拖曳監聽器
     initDragToSelect();
     updateSelectAllBtnState();
 }
@@ -662,67 +676,85 @@ async function handleSaveLocks() {
 
     document.getElementById("save-lock-btn").textContent = "保存中...";
 
-    // 1. 掃描畫面上所有被塗色的格子，合併成連續的時間段
-    let newLocks = [];
-    let currentLock = null;
+    // 1. 先把按下保存當下的這一天存入草稿
+    saveCurrentGridToDraft();
 
-    document.querySelectorAll('.time-slot').forEach(slot => {
-        let isLocked = slot.classList.contains('is-painting-locked');
-        let timeId = slot.id.replace('slot-', ''); // e.g. "0830"
-        let timeStr = `${timeId.substring(0,2)}:${timeId.substring(2,4)}`;
-        let currentMins = timeToMins(timeStr);
+    // 檢查是否有做任何修改
+    if (editedDates.size === 0) {
+        document.getElementById("save-lock-btn").textContent = "保存";
+        document.getElementById("toggle-edit-btn").click(); 
+        return;
+    }
 
-        if (isLocked) {
+    let allNewLocks = [];
+    let datesToDelete = Array.from(editedDates); // 只有被編輯過的天數需要重置
+
+    // 2. 結算所有被修改過的天數
+    datesToDelete.forEach(dateStr => {
+        let slots = draftLocksMap[dateStr] || [];
+        slots.sort(); // 確保時間從小到大排序
+
+        let currentLock = null;
+        slots.forEach(timeId => {
+            let timeStr = `${timeId.substring(0,2)}:${timeId.substring(2,4)}`;
+            
             if (!currentLock) {
-                // 開啟一個新的連續區段
-                currentLock = { start_time: timeStr, duration_mins: 30 };
+                currentLock = { booking_date: dateStr, start_time: timeStr, duration_mins: 30, status: 'locked' };
             } else {
-                // 延續上一個區段
-                currentLock.duration_mins += 30;
+                let expectedNextMins = timeToMins(currentLock.start_time) + currentLock.duration_mins;
+                if (timeToMins(timeStr) === expectedNextMins) {
+                    // 相連的時段，延長長度
+                    currentLock.duration_mins += 30;
+                } else {
+                    // 斷開的時段，先存入上一個，再開一個新的
+                    allNewLocks.push(currentLock);
+                    currentLock = { booking_date: dateStr, start_time: timeStr, duration_mins: 30, status: 'locked' };
+                }
             }
-        } else {
-            if (currentLock) {
-                // 區段結束，存入陣列
-                newLocks.push(currentLock);
-                currentLock = null;
-            }
-        }
+        });
+        if (currentLock) allNewLocks.push(currentLock);
     });
-    // 處理最後一個卡在 22:00 結束的區段
-    if (currentLock) newLocks.push(currentLock);
 
-    // 2. 刪除該日舊有的所有臨時鎖定資料
+    // 3. 批次刪除所有編輯過日期的舊鎖定資料
     const { error: deleteError } = await supabaseClient
         .from('bookings')
         .delete()
-        .eq('booking_date', currentSelectedDate)
+        .in('booking_date', datesToDelete)
         .eq('status', 'locked');
 
     if (deleteError) {
         alert("保存失敗：清除舊資料錯誤");
+        document.getElementById("save-lock-btn").textContent = "保存";
         return;
     }
 
-    // 3. 寫入新的連續鎖定資料
-    if (newLocks.length > 0) {
-        const insertData = newLocks.map(lock => ({
-            booking_date: currentSelectedDate,
-            start_time: lock.start_time,
-            duration_mins: lock.duration_mins,
-            status: 'locked'
-        }));
-
-        const { error: insertError } = await supabaseClient.from('bookings').insert(insertData);
+    // 4. 批次寫入所有新的鎖定資料
+    if (allNewLocks.length > 0) {
+        const { error: insertError } = await supabaseClient.from('bookings').insert(allNewLocks);
         if (insertError) {
             alert("保存失敗：寫入新資料錯誤");
+            document.getElementById("save-lock-btn").textContent = "保存";
             return;
         }
     }
 
-    // 成功後退出編輯模式
+    // 5. 成功後清空記憶體並退出編輯模式
+    draftLocksMap = {};
+    editedDates.clear();
+
     document.getElementById("save-lock-btn").textContent = "保存";
     document.getElementById("toggle-edit-btn").click(); 
 
     await fetchFourteenDaysLocks();
     generateDateCarousel();
+}
+
+function saveCurrentGridToDraft() {
+    if (!isEditMode) return;
+    // 找出畫面上所有被塗成紅色的格子
+    const paintedSlots = Array.from(document.querySelectorAll('.time-slot.is-painting-locked'))
+                              .map(slot => slot.id.replace('slot-', ''));
+    
+    draftLocksMap[currentSelectedDate] = paintedSlots;
+    editedDates.add(currentSelectedDate);
 }
