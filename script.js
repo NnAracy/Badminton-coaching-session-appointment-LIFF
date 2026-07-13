@@ -219,6 +219,8 @@ function addBooking(booking, title, subtitle, isMine) {
     
     const hoursText = (booking.duration_mins >= 60 && booking.status !== 'locked') ? `(${booking.duration_mins / 60}h)` : '';
 
+    block.innerHTML = `<div>${title} ${hoursText}</div>${subtitle ? `<div class="booking-info">${subtitle}</div>` : ''}`;
+
     // 綁定點擊開啟詳情
     block.addEventListener('click', (e) => {
         e.stopPropagation(); 
