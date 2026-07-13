@@ -328,6 +328,10 @@ body.edit-mode #time-grid {
     -webkit-user-select: none;
 }
 
+body.edit-mode .time-slot {
+    touch-action: none; 
+}
+
 /* 編輯模式中，原有的預約色塊變為半透明且不可點擊 (防呆) */
 body.edit-mode .booking-block:not(.status-locked) {
     opacity: 0.4;
