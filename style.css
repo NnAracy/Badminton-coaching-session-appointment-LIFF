@@ -418,6 +418,7 @@ button,
     user-select: none;                  /* 禁用文字選取 */
     -webkit-user-select: none;          /* 針對 Safari/Chrome 的前綴 */
     -webkit-touch-callout: none;        /* 禁用 iOS 長按彈出的原生選單 */
+    -webkit-tap-highlight-color: transparent; /* 移除點按/長按時出現的半透明灰色方塊 */
 }
 
 /* 2. 針對時間列、時間標籤、網格與預約色塊：禁用選取與長按選單 (解決複製到 00 的問題) */
