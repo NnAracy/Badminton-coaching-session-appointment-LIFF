@@ -120,8 +120,13 @@ function generateDateCarousel() {
         btn.className = "date-btn";
         if (dateString === currentSelectedDate) btn.classList.add("active"); 
         
-        let todayBadge = (i === 0) ? `<div class="today-badge">今日</div>` : '';
-        btn.innerHTML = `<span>${weekDay}</span><span style="font-size: 20px; font-weight: bold;">${day}</span>${todayBadge}`;
+        btn.innerHTML = `<span>${weekDay}</span><span style="font-size: 20px; font-weight: bold;">${day}</span>`;
+        
+        // 如果是今天 (i === 0)，加上黑框 class
+        if (i === 0) {
+            btn.classList.add("is-today");
+        }
+
         btn.dataset.date = dateString;
 
         let isFullDayLocked = (lockedDatesMap[dateString] >= 840);
@@ -414,6 +419,11 @@ async function handleBookingSubmit(e) {
     const durationMins = parseInt(document.getElementById("duration-select").value);
     const newStartMins = timeToMins(selectedStartTime);
     const newEndMins = newStartMins + durationMins;
+
+    if (newEndMins > 1320) {
+        showCustomConfirm("預約時段不可超過 22:00，請重新選擇", "我知道了", "#dc3545");
+        return; 
+    }
 
     // 防呆邏輯：檢查重疊
     let hasConflict = todaysBookings.some(existing => {

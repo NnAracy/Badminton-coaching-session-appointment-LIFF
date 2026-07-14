@@ -85,10 +85,30 @@ body {
     position: relative;
 }
 
-/* 懸停狀態 (Hover)：游標停留變純黑 */
-.date-btn:hover {
-    color: #000;
-    border-color: #000;
+/* 游標懸停 (Hover) */
+@media (hover: hover) and (pointer: fine) {
+    .date-btn:hover {
+        color: #000;
+        border-color: #000;
+    }
+}
+
+/* 手機端 (觸控)：按住時直接顯示選定的藍色樣式，解決純黑閃爍 */
+@media (hover: none) {
+    .date-btn:active {
+        background-color: #007bff;
+        color: white;
+        border-color: #007bff;
+    }
+}
+
+.date-btn.is-today {
+    border: 2px solid #555;
+}
+
+/* 當今日未被選定時，整體淡化 */
+.date-btn.is-today:not(.active) {
+    opacity: 0.6; 
 }
 
 /* 選中狀態 (Active)：藍色填滿、白字 */
@@ -120,18 +140,6 @@ body {
     width: 1px;
     height: 100%;
     background-color: #ccc;
-}
-
-.today-badge {
-    position: absolute;
-    bottom: 3px;
-    right: 3px;
-    font-size: 8px;
-    background-color: #FFA500;
-    color: white;
-    padding: 1px 4px;
-    border-radius: 4px;
-    font-weight: bold;
 }
 
 /* ================= 時間表網格設計 ================= */
