@@ -29,12 +29,13 @@ document.addEventListener("DOMContentLoaded", () => {
     initializeLiff(MY_LIFF_ID);
 });
 
-async function sendLineNotification(targetUserId, messageText) {
+async function sendLineNotification(targetUserId, messageText, flexPayload = null) {
     try {
         const { data, error } = await supabaseClient.functions.invoke('line-notify', {
             body: { 
                 userId: targetUserId, 
-                message: messageText 
+                message: messageText,
+                flexPayload: flexPayload // 🟢 將 Flex JSON 一併傳給後端
             }
         });
 
@@ -43,6 +44,49 @@ async function sendLineNotification(targetUserId, messageText) {
     } catch (err) {
         console.error("推播失敗", err);
     }
+}
+
+function buildFlexMessage(statusText, titleText, subtitleText, detailsArray, themeColor) {
+    // 將傳入的明細陣列轉換為 Flex Message 的水平橫排格式
+    const detailBoxes = detailsArray.map(item => ({
+        type: "box",
+        layout: "horizontal",
+        margin: "md",
+        contents: [
+            { type: "text", text: item.label, size: "sm", color: "#666666", flex: 2 },
+            { type: "text", text: item.value, size: "sm", color: "#111111", flex: 5, align: "end", wrap: true, weight: "bold" }
+        ]
+    }));
+
+    return {
+        type: "flex",
+        altText: titleText, // 顯示在聊天列表列的預覽文字
+        contents: {
+            type: "bubble",
+            body: {
+                type: "box",
+                layout: "vertical",
+                contents: [
+                    // 頂部狀態文字 (例如： - 已接單 -)
+                    { type: "text", text: `- ${statusText} -`, color: themeColor, size: "sm", weight: "bold" },
+                    // 大標題
+                    { type: "text", text: titleText, weight: "bold", size: "xl", margin: "md" },
+                    // 副標題
+                    { type: "text", text: subtitleText, size: "xs", color: "#aaaaaa", margin: "sm" },
+                    // 🟢 核心：圓角灰底資訊方塊 (精準還原你的附圖)
+                    {
+                        type: "box",
+                        layout: "vertical",
+                        margin: "lg",
+                        backgroundColor: "#f8f9fa", // 淺灰底色
+                        cornerRadius: "12px",       // 圓角
+                        paddingAll: "16px",         // 內邊距
+                        contents: detailBoxes
+                    }
+                ]
+            }
+        }
+    };
 }
 
 function initializeLiff(myLiffId) {
@@ -364,9 +408,8 @@ function showCustomConfirm(message, okButtonText = "確定", okButtonColor = "#d
     });
 }
 
-// ================= 更新：取消預約 API =================
+// 取消預約
 async function handleCancelBooking() {
-    // 呼叫自訂視窗，並等待使用者點擊
     const isConfirmed = await showCustomConfirm("確定要取消這個時段嗎？\n此動作無法復原。", "確定取消", "#dc3545");
     
     if (isConfirmed) {
@@ -379,10 +422,22 @@ async function handleCancelBooking() {
             fetchAndRenderBookings();
 
             const targetStudentId = currentDetailBooking.user_line_id;
-            const msg = `預約已取消\n日期：${currentDetailBooking.booking_date}\n時間：${currentDetailBooking.start_time}`;
             
-            // 將通知發送給該訂單的學員 (如果是學員自己取消，targetStudentId 也會精準指向自己)
-            sendLineNotification(targetStudentId, msg);
+            // 動態判斷
+            const statusText = "已取消";
+            const titleText = isCoach ? "教練已取消預約" : "您已成功取消預約";
+            const subtitleText = isCoach ? "若有疑問請聯繫教練" : "該時段已釋出，期待您下次預約";
+            const themeColor = "#dc3545"; // 紅色
+
+            const details = [
+                { label: "預約人", value: currentDetailBooking.user_name },
+                { label: "預約日期", value: currentDetailBooking.booking_date },
+                { label: "預約時間", value: currentDetailBooking.start_time },
+                { label: "時長", value: `${currentDetailBooking.duration_mins} 分鐘` }
+            ];
+
+            const flexCard = buildFlexMessage(statusText, titleText, subtitleText, details, themeColor);
+            sendLineNotification(targetStudentId, null, flexCard);
         }
     }
 }
@@ -402,10 +457,15 @@ async function handleConfirmBooking() {
             fetchAndRenderBookings();
 
             const targetStudentId = currentDetailBooking.user_line_id;
-            const msg = `教練已確認您的預約\n日期：${currentDetailBooking.booking_date}\n時間：${currentDetailBooking.start_time}\n狀態：已確定`;
-            
-            // 教練點擊確認後，將通知發送給預約的學員
-            sendLineNotification(targetStudentId, msg);
+            const details = [
+                { label: "預約日期", value: currentDetailBooking.booking_date },
+                { label: "預約時間", value: currentDetailBooking.start_time },
+                { label: "時長", value: `${currentDetailBooking.duration_mins} 分鐘` },
+                { label: "地點", value: currentDetailBooking.location }
+            ];
+
+            const flexCard = buildFlexMessage("已確定", "教練已確認預約", "請準時前往上課地點", details, "#00B900");
+            sendLineNotification(targetStudentId, null, flexCard);
         }
     }
 }
@@ -489,8 +549,16 @@ async function handleBookingSubmit(e) {
     } else {
         document.getElementById("booking-modal").style.display = "none";
         fetchAndRenderBookings();
-        const msg = `預約申請已送出\n日期：${currentSelectedDate}\n時間：${selectedStartTime}\n狀態：待教練確認中`;
-        sendLineNotification(currentUserProfile.userId, msg);
+
+        const details = [
+            { label: "預約日期", value: currentSelectedDate },
+            { label: "預約時間", value: selectedStartTime },
+            { label: "時長", value: `${durationMins} 分鐘` },
+            { label: "地點", value: insertData.location }
+        ];
+
+        const flexCard = buildFlexMessage("待確認", "已送出預約申請", "請等待教練確認此時段", details, "#ffc107"); // 黃色提示
+        sendLineNotification(currentUserProfile.userId, null, flexCard);
     }
 }
 
