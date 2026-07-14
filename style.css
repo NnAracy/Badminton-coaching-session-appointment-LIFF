@@ -407,3 +407,27 @@ body.edit-mode .booking-block.status-locked {
 }
 .date-btn.full-day-locked::after { transform: rotate(45deg); }
 .date-btn.full-day-locked::before { transform: rotate(-45deg); }
+
+/* ================= 行動端原生行為優化 (防止長按選取與複製) ================= */
+
+/* 1. 禁用所有互動按鈕的文字選取與長按選單 */
+button, 
+.date-btn, 
+.close-btn, 
+.confirm-btn {
+    user-select: none;                  /* 禁用文字選取 */
+    -webkit-user-select: none;          /* 針對 Safari/Chrome 的前綴 */
+    -webkit-touch-callout: none;        /* 禁用 iOS 長按彈出的原生選單 */
+}
+
+/* 2. 針對時間列、時間標籤、網格與預約色塊：禁用選取與長按選單 (解決複製到 00 的問題) */
+.time-row, 
+.time-label, 
+.time-slot, 
+.booking-block {
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none; 
+    /* 這裡刻意不加入 -webkit-tap-highlight-color: transparent; 
+       以保留系統原生的點擊高光回饋 */
+}
