@@ -93,15 +93,6 @@ body {
     }
 }
 
-/* 手機端 (觸控)：按住時直接顯示選定的藍色樣式，解決純黑閃爍 */
-@media (hover: none) {
-    .date-btn:active {
-        background-color: #007bff;
-        color: white;
-        border-color: #007bff;
-    }
-}
-
 .date-btn.is-today {
     border: 2px solid #333; /* 使用一致的深黑框 */
 }
