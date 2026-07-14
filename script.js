@@ -29,6 +29,22 @@ document.addEventListener("DOMContentLoaded", () => {
     initializeLiff(MY_LIFF_ID);
 });
 
+async function sendLineNotification(targetUserId, messageText) {
+    try {
+        const { data, error } = await supabaseClient.functions.invoke('line-notify', {
+            body: { 
+                userId: targetUserId, 
+                message: messageText 
+            }
+        });
+
+        if (error) throw error;
+        console.log("推播成功", data);
+    } catch (err) {
+        console.error("推播失敗", err);
+    }
+}
+
 function initializeLiff(myLiffId) {
     liff.init({ liffId: myLiffId })
         .then(() => {
@@ -350,7 +366,7 @@ function showCustomConfirm(message, okButtonText = "確定", okButtonColor = "#d
 
 // ================= 更新：取消預約 API =================
 async function handleCancelBooking() {
-    // 呼叫自訂視窗，並等待使用者點擊（取代原本的 window.confirm）
+    // 呼叫自訂視窗，並等待使用者點擊
     const isConfirmed = await showCustomConfirm("確定要取消這個時段嗎？\n此動作無法復原。", "確定取消", "#dc3545");
     
     if (isConfirmed) {
@@ -361,6 +377,12 @@ async function handleCancelBooking() {
         } else {
             document.getElementById("detail-modal").style.display = "none";
             fetchAndRenderBookings();
+
+            const targetStudentId = currentDetailBooking.user_line_id;
+            const msg = `預約已取消\n日期：${currentDetailBooking.booking_date}\n時間：${currentDetailBooking.start_time}`;
+            
+            // 將通知發送給該訂單的學員 (如果是學員自己取消，targetStudentId 也會精準指向自己)
+            sendLineNotification(targetStudentId, msg);
         }
     }
 }
@@ -378,6 +400,12 @@ async function handleConfirmBooking() {
         } else {
             document.getElementById("detail-modal").style.display = "none";
             fetchAndRenderBookings();
+
+            const targetStudentId = currentDetailBooking.user_line_id;
+            const msg = `教練已確認您的預約\n日期：${currentDetailBooking.booking_date}\n時間：${currentDetailBooking.start_time}\n狀態：已確定`;
+            
+            // 教練點擊確認後，將通知發送給預約的學員
+            sendLineNotification(targetStudentId, msg);
         }
     }
 }
@@ -461,6 +489,8 @@ async function handleBookingSubmit(e) {
     } else {
         document.getElementById("booking-modal").style.display = "none";
         fetchAndRenderBookings();
+        const msg = `預約申請已送出\n日期：${currentSelectedDate}\n時間：${selectedStartTime}\n狀態：待教練確認中`;
+        sendLineNotification(currentUserProfile.userId, msg);
     }
 }
 
