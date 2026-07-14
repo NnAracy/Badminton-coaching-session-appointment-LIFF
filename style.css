@@ -103,12 +103,18 @@ body {
 }
 
 .date-btn.is-today {
-    border: 2px solid #555;
+    border: 2px solid #333; /* 使用一致的深黑框 */
 }
 
-/* 當今日未被選定時，整體淡化 */
+/* 2. 今日未被選定時：整體（包含文字與黑框）淡化至 60% */
 .date-btn.is-today:not(.active) {
     opacity: 0.6; 
+}
+
+/* 🟢 3. 【新增】今日被選定時：強制維持純黑邊框，且不透明度恢復 100% */
+.date-btn.is-today.active {
+    border-color: #000 !important; /* 強制覆蓋 .active 的藍色邊框 */
+    opacity: 1 !important;          /* 確保完全不淡化 */
 }
 
 /* 選中狀態 (Active)：藍色填滿、白字 */
