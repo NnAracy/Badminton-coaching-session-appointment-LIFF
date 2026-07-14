@@ -24,7 +24,7 @@ let draftLocksMap = {};
 let editedDates = new Set();
 
 // 測試用
-let avatarClickCount = 0;
+// let avatarClickCount = 0;
 
 document.addEventListener("DOMContentLoaded", () => {
     setupModalListeners();
@@ -106,40 +106,8 @@ function initializeLiff(myLiffId) {
         }).catch(err => console.error(err));
 }
 
-// ================= 重構登入後的初始化流程 =================
-// async function finishLogin() {
-//     isCoach = (currentUserProfile.userId === COACH_LINE_ID);
-//     document.getElementById("user-name").textContent = currentUserProfile.displayName;
-//     if (currentUserProfile.pictureUrl) document.getElementById("user-avatar").src = currentUserProfile.pictureUrl;
-    
-//     if (isCoach) {
-//         document.getElementById("role-badge").style.display = "inline-block";
-//         document.getElementById("coach-edit-controls").style.display = "flex";
-//         setupEditModeListeners();
-//     }
-    
-//     await fetchFourteenDaysLocks(); 
-//     generateDateCarousel();
-//     fetchAndRenderBookings();
-// }
-
-// 測試用函式
 async function finishLogin() {
-    const forceRole = sessionStorage.getItem('force_role');
-
-    // 判斷身分邏輯
-    if (forceRole === 'coach') {
-        isCoach = true;  // 強制當教練
-        console.warn("⚠️ 測試模式：已強制切換為教練視角");
-    } else if (forceRole === 'student') {
-        isCoach = false; // 強制當一般學員
-        console.warn("⚠️ 測試模式：已強制切換為學員視角");
-    } else {
-        // 正式環境的原本邏輯 (網址沒有參數時，依照真實 LINE ID 判斷)
-        isCoach = (currentUserProfile.userId === COACH_LINE_ID);
-    }
-
-    // 接下來維持你原本的邏輯
+    isCoach = (currentUserProfile.userId === COACH_LINE_ID);
     document.getElementById("user-name").textContent = currentUserProfile.displayName;
     if (currentUserProfile.pictureUrl) document.getElementById("user-avatar").src = currentUserProfile.pictureUrl;
     
@@ -147,16 +115,47 @@ async function finishLogin() {
         document.getElementById("role-badge").style.display = "inline-block";
         document.getElementById("coach-edit-controls").style.display = "flex";
         setupEditModeListeners();
-    } else {
-        // 確保切換回學員時，把教練的 UI 藏起來
-        document.getElementById("role-badge").style.display = "none";
-        document.getElementById("coach-edit-controls").style.display = "none";
     }
     
     await fetchFourteenDaysLocks(); 
     generateDateCarousel();
     fetchAndRenderBookings();
 }
+
+// 測試用函式
+// async function finishLogin() {
+//     const forceRole = sessionStorage.getItem('force_role');
+
+//     // 判斷身分邏輯
+//     if (forceRole === 'coach') {
+//         isCoach = true;  // 強制當教練
+//         console.warn("⚠️ 測試模式：已強制切換為教練視角");
+//     } else if (forceRole === 'student') {
+//         isCoach = false; // 強制當一般學員
+//         console.warn("⚠️ 測試模式：已強制切換為學員視角");
+//     } else {
+//         // 正式環境的原本邏輯 (網址沒有參數時，依照真實 LINE ID 判斷)
+//         isCoach = (currentUserProfile.userId === COACH_LINE_ID);
+//     }
+
+//     // 接下來維持你原本的邏輯
+//     document.getElementById("user-name").textContent = currentUserProfile.displayName;
+//     if (currentUserProfile.pictureUrl) document.getElementById("user-avatar").src = currentUserProfile.pictureUrl;
+    
+//     if (isCoach) {
+//         document.getElementById("role-badge").style.display = "inline-block";
+//         document.getElementById("coach-edit-controls").style.display = "flex";
+//         setupEditModeListeners();
+//     } else {
+//         // 確保切換回學員時，把教練的 UI 藏起來
+//         document.getElementById("role-badge").style.display = "none";
+//         document.getElementById("coach-edit-controls").style.display = "none";
+//     }
+    
+//     await fetchFourteenDaysLocks(); 
+//     generateDateCarousel();
+//     fetchAndRenderBookings();
+// }
 
 // 預先撈取未來 14 天的鎖定資料
 async function fetchFourteenDaysLocks() {
@@ -524,26 +523,26 @@ function setupModalListeners() {
     document.getElementById("detail-confirm-btn").addEventListener("click", handleConfirmBooking);
 
     // 測試用身份切換
-    document.getElementById("user-avatar").addEventListener("click", () => {
-    avatarClickCount++;
-    if (avatarClickCount >= 5) {
-        // 連點五次觸發切換
-        avatarClickCount = 0; // 歸零
-        
-        // 讀取目前的強制狀態，並反轉
-        const currentForceRole = sessionStorage.getItem('force_role');
-        if (currentForceRole === 'coach') {
-            sessionStorage.setItem('force_role', 'student');
-            alert("🔄 已切換為【學員視角】，即將重新載入");
-        } else {
-            sessionStorage.setItem('force_role', 'coach');
-            alert("🔄 已切換為【教練視角】，即將重新載入");
-        }
-        
-        // 重新載入網頁以套用新身分
-        window.location.reload();
-    }
-});
+    // document.getElementById("user-avatar").addEventListener("click", () => {
+    //     avatarClickCount++;
+    //     if (avatarClickCount >= 5) {
+    //         // 連點五次觸發切換
+    //         avatarClickCount = 0; // 歸零
+            
+    //         // 讀取目前的強制狀態，並反轉
+    //         const currentForceRole = sessionStorage.getItem('force_role');
+    //         if (currentForceRole === 'coach') {
+    //             sessionStorage.setItem('force_role', 'student');
+    //             alert("🔄 已切換為【學員視角】，即將重新載入");
+    //         } else {
+    //             sessionStorage.setItem('force_role', 'coach');
+    //             alert("🔄 已切換為【教練視角】，即將重新載入");
+    //         }
+            
+    //         // 重新載入網頁以套用新身分
+    //         window.location.reload();
+    //     }
+    // });
 }
 
 function openBookingModal(timeString) {
