@@ -51,109 +51,67 @@ body {
     font-size: 12px;
 }
 
-/* ================= 日期滑動選單 ================= */
-#date-carousel {
+/* ================= 頂部日期下壓選單 ================= */
+.date-picker-bar {
+    background: #ffffff;
+    padding: 14px 20px;
+    margin: 10px 15px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
     display: flex;
-    overflow-x: auto;
-    padding: 15px;
-    gap: 10px;
-    background-color: white;
-    scrollbar-width: none; 
-    align-items: center; /* 讓分隔線和按鈕垂直置中 */
-}
-#date-carousel::-webkit-scrollbar {
-    display: none;
-}
-
-.date-btn {
-    flex: 0 0 auto;
-    width: 60px;
-    height: 70px;
-    border-radius: 10px;
-    border: 1px solid #e0e0e0;
-    background: white;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
+    justify-content: space-between;
     align-items: center;
-    font-size: 14px;
-    
-    /* 預設狀態：淡化偏灰 */
-    color: #999; 
     cursor: pointer;
-    transition: all 0.2s ease;
-    position: relative;
+    border: 1.5px solid #007bff;
+    transition: background-color 0.2s ease;
 }
 
-/* 電腦端 */
-@media (hover: hover) and (pointer: fine) {
-    .date-btn:hover {
-        color: #000;
-        border-color: #000;
-    }
+.date-picker-bar:active {
+    background-color: #f0f8ff;
 }
 
-/* 手機端 */
-@media (hover: none) {
-    /* 手機按下瞬間變藍 */
-    .date-btn:active {
-        background-color: #007bff !important;
-        color: white !important;
-        border-color: #007bff !important;
-    }
-    
-    .date-btn:active, 
-    .date-btn.active {
-        transition: none !important; 
-    }
-}
-
-.date-btn.is-today {
-    border: 2px solid #333; /* 使用一致的深黑框 */
-}
-
-/* 2. 今日未被選定時：整體（包含文字與黑框）淡化至 60% */
-.date-btn.is-today:not(.active) {
-    opacity: 0.6; 
-}
-
-/* 🟢 3. 【新增】今日被選定時：強制維持純黑邊框，且不透明度恢復 100% */
-.date-btn.is-today.active {
-    border-color: #000 !important; /* 強制覆蓋 .active 的藍色邊框 */
-    opacity: 1 !important;          /* 確保完全不淡化 */
-}
-
-/* 選中狀態 (Active)：藍色填滿、白字 */
-.date-btn.active {
-    background-color: #007bff; /* 專業藍色 */
-    color: white;
-    border-color: #007bff;
-}
-
-
-
-/* 月份分隔線 */
-.month-divider {
+.date-display {
     display: flex;
-    flex-direction: column;
     align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    height: 60px;
-    margin: 0 5px;
+    gap: 8px;
+    font-size: 16px;
 }
 
-.month-divider span {
-    font-size: 12px;
+.date-display .value {
     font-weight: bold;
-    color: #666;
-    margin-bottom: 4px;
+    color: #007bff;
+    font-size: 18px;
 }
 
-.month-divider .line {
-    width: 1px;
-    height: 100%;
-    background-color: #ccc;
+.change-btn {
+    font-size: 13px;
+    background: #007bff;
+    color: white;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-weight: bold;
+}
+
+/* ================= Flatpickr 客製化樣式 ================= */
+/* 全日鎖定：打叉並反灰 */
+.flatpickr-day.is-fully-locked {
+    background-color: #f8d7da !important;
+    color: #721c24 !important;
+    text-decoration: line-through;
+    opacity: 0.6;
+}
+
+/* 部分時段有約：下方加上一個提示小紅點 */
+.flatpickr-day.has-locks::after {
+    content: '';
+    position: absolute;
+    bottom: 4px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background-color: #dc3545;
 }
 
 /* ================= 時間表網格設計 ================= */

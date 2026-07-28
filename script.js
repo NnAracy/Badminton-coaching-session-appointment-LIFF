@@ -13,6 +13,7 @@ let selectedStartTime = '';   // 格式 HH:mm
 let todaysBookings = [];      // 儲存當前選定日期的所有預約，供防呆檢查
 let currentDetailBooking = null;
 let lockedDatesMap = {};
+let calendarInstance = null;
 
 let isEditMode = false;
 let isDragging = false;
@@ -28,7 +29,6 @@ let editedDates = new Set();
 
 document.addEventListener("DOMContentLoaded", () => {
     setupModalListeners();
-    generateDateCarousel();
     initializeLiff(MY_LIFF_ID);
 });
 
@@ -117,8 +117,8 @@ async function finishLogin() {
         setupEditModeListeners();
     }
     
-    await fetchFourteenDaysLocks(); 
-    generateDateCarousel();
+    await fetchThirtyDaysLocks(); 
+    initCalendar();
     fetchAndRenderBookings();
 }
 
@@ -158,90 +158,81 @@ async function finishLogin() {
 // }
 
 // 預先撈取未來 14 天的鎖定資料
-async function fetchFourteenDaysLocks() {
+async function fetchThirtyDaysLocks() {
     const today = new Date();
     const endDate = new Date(today);
-    endDate.setDate(today.getDate() + 14);
+    endDate.setDate(today.getDate() + 30); // 擴展為 30 天
 
     const startStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
     const endStr = `${endDate.getFullYear()}-${String(endDate.getMonth()+1).padStart(2,'0')}-${String(endDate.getDate()).padStart(2,'0')}`;
 
     const { data, error } = await supabaseClient
         .from('bookings')
-        .select('booking_date, duration_mins')
-        .eq('status', 'locked')
+        .select('booking_date, duration_mins, status')
         .gte('booking_date', startStr)
         .lte('booking_date', endStr);
 
-    lockedDatesMap = {}; // 清空重算
+    lockedDatesMap = {}; 
     if (!error && data) {
-        data.forEach(lock => {
-            if (!lockedDatesMap[lock.booking_date]) lockedDatesMap[lock.booking_date] = 0;
-            lockedDatesMap[lock.booking_date] += lock.duration_mins;
+        data.forEach(item => {
+            if (!lockedDatesMap[item.booking_date]) {
+                lockedDatesMap[item.booking_date] = { totalMins: 0, count: 0 };
+            }
+            // 如果是鎖定，計入鎖定時間；如果是一般預約，計入有約數量
+            if (item.status === 'locked') {
+                lockedDatesMap[item.booking_date].totalMins += item.duration_mins;
+            } else {
+                lockedDatesMap[item.booking_date].count += 1;
+            }
         });
     }
 }
 
-function generateDateCarousel() {
-    const carousel = document.getElementById("date-carousel");
-    carousel.innerHTML = ""; 
+function initCalendar() {
     const today = new Date();
-    const daysOfWeek = ["日", "一", "二", "三", "四", "五", "六"];
-    let previousMonth = -1;
+    const maxDate = new Date();
+    maxDate.setDate(today.getDate() + 30); // 限制只能約一個月內
 
-    // 🟢 【修正 1】判斷是否為初次載入，如果是，才把今天設為預設；否則保留教練當下的選擇
-    let isFirstLoad = !currentSelectedDate;
-
-    for (let i = 0; i <= 14; i++) {
-        let futureDate = new Date(today);
-        futureDate.setDate(today.getDate() + i);
-
-        let dateString = `${futureDate.getFullYear()}-${String(futureDate.getMonth()+1).padStart(2,'0')}-${String(futureDate.getDate()).padStart(2,'0')}`;
-        
-        if (isFirstLoad && i === 0) currentSelectedDate = dateString;
-
-        let currentMonth = futureDate.getMonth() + 1;
-        let day = futureDate.getDate();
-        let weekDay = daysOfWeek[futureDate.getDay()];
-
-        if (previousMonth !== -1 && currentMonth !== previousMonth) {
-            let divider = document.createElement("div");
-            divider.className = "month-divider";
-            divider.innerHTML = `<span>${currentMonth}月</span><div class="line"></div>`;
-            carousel.appendChild(divider);
-        }
-        previousMonth = currentMonth;
-
-        let btn = document.createElement("div");
-        btn.className = "date-btn";
-        if (dateString === currentSelectedDate) btn.classList.add("active"); 
-        
-        btn.innerHTML = `<span>${weekDay}</span><span style="font-size: 20px; font-weight: bold;">${day}</span>`;
-        
-        // 如果是今天 (i === 0)，加上黑框 class
-        if (i === 0) {
-            btn.classList.add("is-today");
-        }
-
-        btn.dataset.date = dateString;
-
-        let isFullDayLocked = (lockedDatesMap[dateString] >= 840);
-        if (isFullDayLocked) {
-            btn.classList.add("full-day-locked");
-            if (!isCoach) btn.style.pointerEvents = "none";
-        }
-
-        btn.addEventListener('click', () => {
-            // 🟢 【修正 3-支援】在切換日期前，把目前這天的塗鴉存進記憶體
-            if (isEditMode) saveCurrentGridToDraft();
-
-            document.querySelectorAll('.date-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            currentSelectedDate = btn.dataset.date;
-            fetchAndRenderBookings(); 
-        });
-        carousel.appendChild(btn);
+    // 預設日期設定為今天 (如果尚未選定)
+    if (!currentSelectedDate) {
+        currentSelectedDate = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
     }
+    document.getElementById("current-date-text").textContent = currentSelectedDate;
+
+    // 將 Flatpickr 綁定在我們設計的 #date-picker-bar 上
+    calendarInstance = flatpickr("#date-picker-bar", {
+        locale: "zh",               // 繁體中文
+        defaultDate: currentSelectedDate,
+        minDate: "today",           // 過去日期不可選
+        maxDate: maxDate,           // 最多選到 30 天後
+        disableMobile: "true",      // 強制使用 Flatpickr 的精美介面，不使用手機原生難看的 UI
+        
+        // 🟢 核心鉤子：每次月曆渲染日期格子時，自動繪製紅點與打叉
+        onDayCreate: function(dObj, dStr, fp, dayElem) {
+            const dateStr = fp.formatDate(dayElem.dateObj, "Y-m-d");
+            const dayInfo = lockedDatesMap[dateStr];
+
+            if (dayInfo) {
+                // 如果鎖定時間超過 840 分鐘 (14小時，代表整天營業時間都鎖了)，標記全日鎖定
+                if (dayInfo.totalMins >= 840) {
+                    dayElem.classList.add("is-fully-locked");
+                } 
+                // 如果該天有部分鎖定或是已有其他預約，下方加入紅點提示
+                else if (dayInfo.totalMins > 0 || dayInfo.count > 0) {
+                    dayElem.classList.add("has-locks");
+                }
+            }
+        },
+
+        // 🟢 當使用者點選了新日期
+        onChange: function(selectedDates, dateStr, instance) {
+            if (isEditMode) saveCurrentGridToDraft(); // 支援教練模式換日自動暫存
+            
+            currentSelectedDate = dateStr;
+            document.getElementById("current-date-text").textContent = dateStr;
+            fetchAndRenderBookings(); 
+        }
+    });
 }
 
 // 核心：從資料庫撈取並渲染網格
@@ -912,7 +903,7 @@ async function handleSaveLocks() {
     document.getElementById("toggle-edit-btn").click(); 
 
     await fetchFourteenDaysLocks();
-    generateDateCarousel();
+    calendarInstance.redraw()
 }
 
 function saveCurrentGridToDraft() {
