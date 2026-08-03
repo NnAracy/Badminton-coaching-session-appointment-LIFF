@@ -286,7 +286,6 @@ function renderCoachSelector() {
         
         updateUIByRoleAndCoach();
         await fetchThirtyDaysLocks();
-        
         if (calendarInstance) calendarInstance.redraw(); // 更新月曆紅點
         fetchAndRenderBookings(); 
     });
@@ -551,6 +550,7 @@ async function handleCancelBooking() {
 
             const flexCard = buildFlexMessage(statusText, titleText, subtitleText, details, themeColor);
             sendLineNotification(targetStudentId, null, flexCard);
+            await fetchThirtyDaysLocks();
             if (calendarInstance) calendarInstance.redraw();
         }
     }
@@ -696,6 +696,7 @@ async function handleBookingSubmit(e) {
 
         const flexCard = buildFlexMessage("待確認", "已送出預約申請", "請等待教練確認此時段", details, "#ffc107"); // 黃色提示
         sendLineNotification(currentUserProfile.userId, null, flexCard);
+        await fetchThirtyDaysLocks();
         if (calendarInstance) calendarInstance.redraw();
     }
 }
