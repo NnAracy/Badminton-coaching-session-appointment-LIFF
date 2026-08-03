@@ -6,7 +6,8 @@ const SUPABASE_ANON_KEY = 'sb_publishable_ck-5xYAyrCAlrqSnaPKeSQ_h2fbGmwo';
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // 狀態變數
-let currentUserRole = 'user'; // 'user', 'coach', 'admin'
+let currentUserIsAdmin = false;  // 是否為總教練
+let currentUserIsCoach = false;  // 是否有教練身份 (決定會不會出現在選單)
 let coachesList = [];         // 儲存從資料庫抓下來的教練名單
 let currentSelectedCoachId = ''; // 畫面當下正在顯示哪位教練的時間表
 let currentSelectedDate = ''; // 格式 YYYY-MM-DD
@@ -109,44 +110,43 @@ function initializeLiff(myLiffId) {
 }
 
 async function finishLogin() {
-    // 1. 查詢當前使用者的權限 (Admin, Coach, 或 User)
-    const { data: roleData } = await supabaseClient
+    // 1. 查詢當前使用者的雙重權限
+    const { data: roleData, error } = await supabaseClient
         .from('user_roles')
-        .select('role')
+        .select('is_admin, is_coach')
         .eq('line_id', currentUserProfile.userId)
         .single();
 
-    currentUserRole = roleData ? roleData.role : 'user';
+    if (error) console.warn("讀取權限失敗 (或查無此人):", error);
 
-    console.log(currentUserProfile.userId);
-    console.log(currentUserRole);
+    if (roleData) {
+        currentUserIsAdmin = roleData.is_admin;
+        currentUserIsCoach = roleData.is_coach;
+    }
 
     document.getElementById("user-name").textContent = currentUserProfile.displayName;
     if (currentUserProfile.pictureUrl) document.getElementById("user-avatar").src = currentUserProfile.pictureUrl;
     
-    // 2. 撈取教練名單 (包含 admin 與 coach) 供選單使用
     const { data: coaches } = await supabaseClient
         .from('user_roles')
         .select('line_id, display_name')
-        .in('role', ['coach', 'admin']);
+        .eq('is_coach', true); 
 
     coachesList = coaches || [];
 
     // 3. 設定預設顯示的教練
     if (coachesList.length > 0) {
-        // 如果自己是教練或管理員，預設看自己的表；如果是學生，預設看列表第一位教練的表
-        if (currentUserRole === 'coach' || currentUserRole === 'admin') {
+        // 如果自己是教練，預設看自己的表；否則看列表第一位
+        if (currentUserIsCoach) {
             currentSelectedCoachId = currentUserProfile.userId;
         } else {
             currentSelectedCoachId = coachesList[0].line_id;
         }
     }
 
-    // 4. 渲染教練選單並設定初始 UI
     renderCoachSelector();
     updateUIByRoleAndCoach();
     
-    // 5. 抓取資料並渲染
     await fetchThirtyDaysLocks(); 
     initCalendar();
     fetchAndRenderBookings();
@@ -268,10 +268,7 @@ function updateUIByRoleAndCoach() {
     const editControls = document.getElementById("coach-edit-controls");
     const roleBadge = document.getElementById("role-badge");
 
-    // 判斷是否有編輯權限：(是 Admin) 或 (是 Coach 且正在看自己的表)
-    const canEditThisSchedule = 
-        currentUserRole === 'admin' || 
-        (currentUserRole === 'coach' && currentSelectedCoachId === currentUserProfile.userId);
+    const canManageThisSchedule = currentUserIsAdmin || (currentUserIsCoach && currentSelectedCoachId === currentUserProfile.userId);
 
     if (canEditThisSchedule) {
         editControls.style.display = "flex";
@@ -281,9 +278,9 @@ function updateUIByRoleAndCoach() {
     }
 
     // 顯示身分徽章
-    if (currentUserRole !== 'user') {
+    if (currentUserIsAdmin || currentUserIsCoach) {
         roleBadge.style.display = "inline-block";
-        roleBadge.textContent = currentUserRole === 'admin' ? "總教練" : "教練";
+        roleBadge.textContent = currentUserIsAdmin ? "管理員" : "教練";
     }
 }
 
@@ -305,10 +302,10 @@ async function fetchAndRenderBookings() {
     todaysBookings = data; 
 
     data.forEach(booking => {
-        // 【核心修正】加入 !isCoach 條件。
-        // 如果是教練，強制將 isMine 設為 false，徹底關閉「自己的預約」的特殊樣式與邏輯
-
-        let isMine = (currentUserRole === 'user') && (currentUserProfile && booking.user_line_id === currentUserProfile.userId);
+        const canManageThisSchedule = currentUserIsAdmin || (currentUserIsCoach && currentSelectedCoachId === currentUserProfile.userId);
+        const isNormalUser = !currentUserIsAdmin && !currentUserIsCoach;
+        
+        let isMine = isNormalUser && (currentUserProfile && booking.user_line_id === currentUserProfile.userId);
         
         let title = '';
         let subtitle = '';
@@ -316,7 +313,7 @@ async function fetchAndRenderBookings() {
         if (booking.status === 'locked') {
             title = "無法預約";
             subtitle = "";
-        } else if (currentUserRole === 'coach' || currentUserRole === 'admin') {
+        } else if (canManageThisSchedule) {
             title = `${booking.user_name} (${booking.participants}人)`;
             subtitle = booking.location;
         } else if (isMine) {
@@ -386,10 +383,11 @@ function addBooking(booking, title, subtitle, isMine) {
     block.style.height = `calc(${slotsSpanned * 100}% + ${slotsSpanned - 1}px - 6px)`;
     
     const hoursText = (booking.duration_mins >= 60 && booking.status !== 'locked') ? `(${booking.duration_mins / 60}h)` : '';
+    const canManageThisSchedule = currentUserIsAdmin || (currentUserIsCoach && currentSelectedCoachId === currentUserProfile.userId);
 
     // 🟢 【新增】判斷是否為首次試上，並且只有教練或本人才看得到
     let trialHtml = '';
-    if (booking.is_first_trial && (currentUserRole === 'coach' || currentUserRole === 'admin' || isMine) && booking.status !== 'locked') {
+    if (booking.is_first_trial && (canManageThisSchedule || isMine) && booking.status !== 'locked') {
         // 使用原本的 trial-badge 類別，但稍微覆寫大小以適應小色塊
         trialHtml = `<span class="trial-badge" style="font-size: 10px; padding: 2px 6px; margin-left: 4px;">首次試上</span>`;
     }
@@ -403,7 +401,7 @@ function addBooking(booking, title, subtitle, isMine) {
         
         if (booking.status === 'locked') return;
 
-        if (currentUserRole === 'coach' || currentUserRole === 'admin' || isMine) {
+        if (canManageThisSchedule || isMine) {
             openDetailModal(booking);
         }
     });
@@ -419,15 +417,18 @@ function openDetailModal(booking) {
     const cancelBtn = document.getElementById("detail-cancel-btn");
     const confirmBtn = document.getElementById("detail-confirm-btn");
 
+    const canManageThisSchedule = currentUserIsAdmin || (currentUserIsCoach && currentSelectedCoachId === currentUserProfile.userId);
+    const isNormalUser = !currentUserIsAdmin && !currentUserIsCoach;
+
     // 取消按鈕邏輯：學員不能取消 confirmed
-    if (booking.status === 'confirmed' && currentUserRole === 'user') {
+    if (booking.status === 'confirmed' && isNormalUser) {
         cancelBtn.style.display = "none"; 
     } else {
         cancelBtn.style.display = "block";
     }
 
     // 確認按鈕邏輯：只有教練且 pending 才顯示
-    if ((currentUserRole === 'coach' || currentUserRole === 'admin') && booking.status === 'pending') {
+    if (canManageThisSchedule && booking.status === 'pending') {
         confirmBtn.style.display = "block";
     } else {
         confirmBtn.style.display = "none";
@@ -493,6 +494,8 @@ function showCustomConfirm(message, okButtonText = "確定", okButtonColor = "#d
 async function handleCancelBooking() {
     const isConfirmed = await showCustomConfirm("確定要取消這個時段嗎？\n此動作無法復原。", "確定取消", "#dc3545");
     
+    const canManageThisSchedule = currentUserIsAdmin || (currentUserIsCoach && currentSelectedCoachId === currentUserProfile.userId);
+    
     if (isConfirmed) {
         const { error } = await supabaseClient.from('bookings').delete().eq('id', currentDetailBooking.id);
         if (error) {
@@ -505,10 +508,9 @@ async function handleCancelBooking() {
             const targetStudentId = currentDetailBooking.user_line_id;
             
             // 動態判斷
-            const isCanceledByCoach = (currentUserRole === 'coach' || currentUserRole === 'admin');
             const statusText = "已取消";
-            const titleText = isCanceledByCoach ? "教練已取消預約" : "您已成功取消預約";
-            const subtitleText = isCanceledByCoach ? "若有疑問請聯繫教練" : "該時段已釋出，期待您下次預約";
+            const titleText = canManageThisSchedule ? "教練已取消預約" : "您已成功取消預約";
+            const subtitleText = canManageThisSchedule ? "若有疑問請聯繫教練" : "該時段已釋出，期待您下次預約";
             const themeColor = "#dc3545"; // 紅色
 
             const details = [
