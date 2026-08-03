@@ -30,6 +30,7 @@ let editedDates = new Set();
 document.addEventListener("DOMContentLoaded", () => {
     setupModalListeners();
     initializeLiff(MY_LIFF_ID);
+    initCalendar();
 });
 
 async function sendLineNotification(targetUserId, messageText, flexPayload = null) {
@@ -157,7 +158,7 @@ async function finishLogin() {
 //     fetchAndRenderBookings();
 // }
 
-// 預先撈取未來 14 天的鎖定資料
+// 預先撈取未來 30 天的鎖定資料
 async function fetchThirtyDaysLocks() {
     const today = new Date();
     const endDate = new Date(today);
@@ -902,7 +903,7 @@ async function handleSaveLocks() {
     document.getElementById("save-lock-btn").textContent = "保存";
     document.getElementById("toggle-edit-btn").click(); 
 
-    await fetchFourteenDaysLocks();
+    await fetchThirtyDaysLocks();
     calendarInstance.redraw()
 }
 
