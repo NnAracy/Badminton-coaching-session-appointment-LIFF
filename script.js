@@ -152,18 +152,19 @@ async function finishLogin() {
     fetchAndRenderBookings();
 }
 
-// 預先撈取未來 30 天的鎖定資料
+// 預先撈取未來 30 天的預約與鎖定資料
 async function fetchThirtyDaysLocks() {
     const today = new Date();
     const endDate = new Date(today);
-    endDate.setDate(today.getDate() + 30); // 擴展為 30 天
+    endDate.setDate(today.getDate() + 30); 
 
     const startStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
     const endStr = `${endDate.getFullYear()}-${String(endDate.getMonth()+1).padStart(2,'0')}-${String(endDate.getDate()).padStart(2,'0')}`;
 
     const { data, error } = await supabaseClient
         .from('bookings')
-        .select('booking_date, duration_mins, status')
+        // 🟢 新增查詢 user_line_id
+        .select('booking_date, duration_mins, status, user_line_id') 
         .gte('booking_date', startStr)
         .lte('booking_date', endStr)
         .eq('coach_line_id', currentSelectedCoachId);
@@ -172,13 +173,24 @@ async function fetchThirtyDaysLocks() {
     if (!error && data) {
         data.forEach(item => {
             if (!lockedDatesMap[item.booking_date]) {
-                lockedDatesMap[item.booking_date] = { totalMins: 0, count: 0 };
+                // 🟢 重新定義資料結構
+                lockedDatesMap[item.booking_date] = { 
+                    lockedMins: 0,       // 記錄鎖定的總分鐘數 (用來判斷全日打叉)
+                    hasBooking: false,   // 該日是否有任何預約
+                    hasMyBooking: false  // 該日是否有「我」的預約
+                };
             }
-            // 如果是鎖定，計入鎖定時間；如果是一般預約，計入有約數量
+            
             if (item.status === 'locked') {
-                lockedDatesMap[item.booking_date].totalMins += item.duration_mins;
+                lockedDatesMap[item.booking_date].lockedMins += item.duration_mins;
             } else {
-                lockedDatesMap[item.booking_date].count += 1;
+                // 只要不是 locked，就是有預約
+                lockedDatesMap[item.booking_date].hasBooking = true;
+                
+                // 判斷這筆預約是不是當前使用者的
+                if (currentUserProfile && item.user_line_id === currentUserProfile.userId) {
+                    lockedDatesMap[item.booking_date].hasMyBooking = true;
+                }
             }
         });
     }
@@ -209,13 +221,30 @@ function initCalendar() {
             const dayInfo = lockedDatesMap[dateStr];
 
             if (dayInfo) {
-                // 如果鎖定時間超過 840 分鐘 (14小時，代表整天營業時間都鎖了)，標記全日鎖定
-                if (dayInfo.totalMins >= 840) {
+                // 1. 全日鎖定 (打叉) 邏輯保持不變：鎖定超過 14 小時即視為全日反灰
+                if (dayInfo.lockedMins >= 840) {
                     dayElem.classList.add("is-fully-locked");
                 } 
-                // 如果該天有部分鎖定或是已有其他預約，下方加入紅點提示
-                else if (dayInfo.totalMins > 0 || dayInfo.count > 0) {
-                    dayElem.classList.add("has-locks");
+                
+                // 2. 🟢 視角判定與紅點顯示邏輯
+                let showRedDot = false;
+                
+                const isNormalUser = !currentUserIsAdmin && !currentUserIsCoach;
+                const isCoachViewingSelf = currentUserIsCoach && (currentSelectedCoachId === currentUserProfile.userId);
+
+                if (isNormalUser) {
+                    // 視角 A：學員看任意教練，只有「自己有預約」才顯示紅點
+                    showRedDot = dayInfo.hasMyBooking;
+                } else if (isCoachViewingSelf) {
+                    // 視角 B：教練看自己，只要「有預約」(不含鎖定) 就顯示紅點
+                    showRedDot = dayInfo.hasBooking;
+                } else {
+                    // 視角 C：管理員，或教練看其他教練的表，不需要紅點
+                    showRedDot = false;
+                }
+
+                if (showRedDot) {
+                    dayElem.classList.add("has-locks"); 
                 }
             }
         },
