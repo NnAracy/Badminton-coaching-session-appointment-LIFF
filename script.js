@@ -152,41 +152,6 @@ async function finishLogin() {
     fetchAndRenderBookings();
 }
 
-// 測試用函式
-// async function finishLogin() {
-//     const forceRole = sessionStorage.getItem('force_role');
-
-//     // 判斷身分邏輯
-//     if (forceRole === 'coach') {
-//         isCoach = true;  // 強制當教練
-//         console.warn("⚠️ 測試模式：已強制切換為教練視角");
-//     } else if (forceRole === 'student') {
-//         isCoach = false; // 強制當一般學員
-//         console.warn("⚠️ 測試模式：已強制切換為學員視角");
-//     } else {
-//         // 正式環境的原本邏輯 (網址沒有參數時，依照真實 LINE ID 判斷)
-//         isCoach = (currentUserProfile.userId === COACH_LINE_ID);
-//     }
-
-//     // 接下來維持你原本的邏輯
-//     document.getElementById("user-name").textContent = currentUserProfile.displayName;
-//     if (currentUserProfile.pictureUrl) document.getElementById("user-avatar").src = currentUserProfile.pictureUrl;
-    
-//     if (isCoach) {
-//         document.getElementById("role-badge").style.display = "inline-block";
-//         document.getElementById("coach-edit-controls").style.display = "flex";
-//         setupEditModeListeners();
-//     } else {
-//         // 確保切換回學員時，把教練的 UI 藏起來
-//         document.getElementById("role-badge").style.display = "none";
-//         document.getElementById("coach-edit-controls").style.display = "none";
-//     }
-    
-//     await fetchFourteenDaysLocks(); 
-//     generateDateCarousel();
-//     fetchAndRenderBookings();
-// }
-
 // 預先撈取未來 30 天的鎖定資料
 async function fetchThirtyDaysLocks() {
     const today = new Date();
@@ -342,7 +307,8 @@ async function fetchAndRenderBookings() {
     data.forEach(booking => {
         // 【核心修正】加入 !isCoach 條件。
         // 如果是教練，強制將 isMine 設為 false，徹底關閉「自己的預約」的特殊樣式與邏輯
-        let isMine = !isCoach && (currentUserProfile && booking.user_line_id === currentUserProfile.userId);
+
+        let isMine = (currentUserRole === 'user') && (currentUserProfile && booking.user_line_id === currentUserProfile.userId);
         
         let title = '';
         let subtitle = '';
@@ -350,7 +316,7 @@ async function fetchAndRenderBookings() {
         if (booking.status === 'locked') {
             title = "無法預約";
             subtitle = "";
-        } else if (isCoach) {
+        } else if (currentUserRole === 'coach' || currentUserRole === 'admin') {
             title = `${booking.user_name} (${booking.participants}人)`;
             subtitle = booking.location;
         } else if (isMine) {
@@ -393,7 +359,7 @@ function renderEmptyTimeGrid() {
                 const today = new Date();
                 const todayString = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
                 
-                if (currentSelectedDate === todayString && !isCoach) {
+                if (currentSelectedDate === todayString && currentUserRole === 'user') {
                     // 使用我們寫好的 Custom Confirm 來顯示提示，並且只有單個「我知道了」按鈕
                     showCustomConfirm("最早只能從明日開始預約\n如需今日預約請聯繫教練", "我知道了", "#dc3545");
                     return; // 終止執行，不打開預約表單
@@ -423,7 +389,7 @@ function addBooking(booking, title, subtitle, isMine) {
 
     // 🟢 【新增】判斷是否為首次試上，並且只有教練或本人才看得到
     let trialHtml = '';
-    if (booking.is_first_trial && (isCoach || isMine) && booking.status !== 'locked') {
+    if (booking.is_first_trial && (currentUserRole === 'coach' || currentUserRole === 'admin' || isMine) && booking.status !== 'locked') {
         // 使用原本的 trial-badge 類別，但稍微覆寫大小以適應小色塊
         trialHtml = `<span class="trial-badge" style="font-size: 10px; padding: 2px 6px; margin-left: 4px;">首次試上</span>`;
     }
@@ -437,7 +403,7 @@ function addBooking(booking, title, subtitle, isMine) {
         
         if (booking.status === 'locked') return;
 
-        if (isCoach || isMine) {
+        if (currentUserRole === 'coach' || currentUserRole === 'admin' || isMine) {
             openDetailModal(booking);
         }
     });
@@ -454,14 +420,14 @@ function openDetailModal(booking) {
     const confirmBtn = document.getElementById("detail-confirm-btn");
 
     // 取消按鈕邏輯：學員不能取消 confirmed
-    if (booking.status === 'confirmed' && !isCoach) {
+    if (booking.status === 'confirmed' && currentUserRole === 'user') {
         cancelBtn.style.display = "none"; 
     } else {
         cancelBtn.style.display = "block";
     }
 
     // 確認按鈕邏輯：只有教練且 pending 才顯示
-    if (isCoach && booking.status === 'pending') {
+    if ((currentUserRole === 'coach' || currentUserRole === 'admin') && booking.status === 'pending') {
         confirmBtn.style.display = "block";
     } else {
         confirmBtn.style.display = "none";
@@ -539,9 +505,10 @@ async function handleCancelBooking() {
             const targetStudentId = currentDetailBooking.user_line_id;
             
             // 動態判斷
+            const isCanceledByCoach = (currentUserRole === 'coach' || currentUserRole === 'admin');
             const statusText = "已取消";
-            const titleText = isCoach ? "教練已取消預約" : "您已成功取消預約";
-            const subtitleText = isCoach ? "若有疑問請聯繫教練" : "該時段已釋出，期待您下次預約";
+            const titleText = isCanceledByCoach ? "教練已取消預約" : "您已成功取消預約";
+            const subtitleText = isCanceledByCoach ? "若有疑問請聯繫教練" : "該時段已釋出，期待您下次預約";
             const themeColor = "#dc3545"; // 紅色
 
             const details = [
@@ -954,7 +921,7 @@ async function handleSaveLocks() {
                 } else {
                     // 斷開的時段，先存入上一個，再開一個新的
                     allNewLocks.push(currentLock);
-                    currentLock = { booking_date: dateStr, start_time: timeStr, duration_mins: 30, status: 'locked' };
+                    currentLock = { booking_date: dateStr, start_time: timeStr, duration_mins: 30, status: 'locked', coach_line_id: currentSelectedCoachId };
                 }
             }
         });
