@@ -6,8 +6,9 @@ const SUPABASE_ANON_KEY = 'sb_publishable_ck-5xYAyrCAlrqSnaPKeSQ_h2fbGmwo';
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // 狀態變數
-let currentUserProfile = null;
-let isCoach = false;
+let currentUserRole = 'user'; // 'user', 'coach', 'admin'
+let coachesList = [];         // 儲存從資料庫抓下來的教練名單
+let currentSelectedCoachId = ''; // 畫面當下正在顯示哪位教練的時間表
 let currentSelectedDate = ''; // 格式 YYYY-MM-DD
 let selectedStartTime = '';   // 格式 HH:mm
 let todaysBookings = [];      // 儲存當前選定日期的所有預約，供防呆檢查
@@ -108,16 +109,41 @@ function initializeLiff(myLiffId) {
 }
 
 async function finishLogin() {
-    isCoach = (currentUserProfile.userId === COACH_LINE_ID);
+    // 1. 查詢當前使用者的權限 (Admin, Coach, 或 User)
+    const { data: roleData } = await supabaseClient
+        .from('user_roles')
+        .select('role')
+        .eq('line_id', currentUserProfile.userId)
+        .single();
+
+    currentUserRole = roleData ? roleData.role : 'user';
+
     document.getElementById("user-name").textContent = currentUserProfile.displayName;
     if (currentUserProfile.pictureUrl) document.getElementById("user-avatar").src = currentUserProfile.pictureUrl;
     
-    if (isCoach) {
-        document.getElementById("role-badge").style.display = "inline-block";
-        document.getElementById("coach-edit-controls").style.display = "flex";
-        setupEditModeListeners();
+    // 2. 撈取教練名單 (包含 admin 與 coach) 供選單使用
+    const { data: coaches } = await supabaseClient
+        .from('user_roles')
+        .select('line_id, display_name')
+        .in('role', ['coach', 'admin']);
+
+    coachesList = coaches || [];
+
+    // 3. 設定預設顯示的教練
+    if (coachesList.length > 0) {
+        // 如果自己是教練或管理員，預設看自己的表；如果是學生，預設看列表第一位教練的表
+        if (currentUserRole === 'coach' || currentUserRole === 'admin') {
+            currentSelectedCoachId = currentUserProfile.userId;
+        } else {
+            currentSelectedCoachId = coachesList[0].line_id;
+        }
     }
+
+    // 4. 渲染教練選單並設定初始 UI
+    renderCoachSelector();
+    updateUIByRoleAndCoach();
     
+    // 5. 抓取資料並渲染
     await fetchThirtyDaysLocks(); 
     initCalendar();
     fetchAndRenderBookings();
@@ -171,7 +197,8 @@ async function fetchThirtyDaysLocks() {
         .from('bookings')
         .select('booking_date, duration_mins, status')
         .gte('booking_date', startStr)
-        .lte('booking_date', endStr);
+        .lte('booking_date', endStr)
+        .eq('coach_line_id', currentSelectedCoachId);
 
     lockedDatesMap = {}; 
     if (!error && data) {
@@ -236,6 +263,62 @@ function initCalendar() {
     });
 }
 
+// 渲染教練下拉式選單
+function renderCoachSelector() {
+    // 假設你在 HTML 中新增了一個 <select id="coach-selector"></select>
+    const selector = document.getElementById("coach-selector");
+    if (!selector) return;
+
+    selector.innerHTML = "";
+    coachesList.forEach(coach => {
+        let option = document.createElement("option");
+        option.value = coach.line_id;
+        option.textContent = coach.display_name;
+        if (coach.line_id === currentSelectedCoachId) {
+            option.selected = true;
+        }
+        selector.appendChild(option);
+    });
+
+    // 當切換教練時，重新計算權限並重新抓資料
+    selector.addEventListener("change", async (e) => {
+        currentSelectedCoachId = e.target.value;
+        
+        // 切換教練時，強制退出編輯模式以策安全
+        if (isEditMode) document.getElementById("toggle-edit-btn").click();
+        
+        updateUIByRoleAndCoach();
+        await fetchThirtyDaysLocks();
+        
+        if (calendarInstance) calendarInstance.redraw(); // 更新月曆紅點
+        fetchAndRenderBookings(); 
+    });
+}
+
+// 根據身分與目前查看的教練，動態顯示/隱藏編輯按鈕
+function updateUIByRoleAndCoach() {
+    const editControls = document.getElementById("coach-edit-controls");
+    const roleBadge = document.getElementById("role-badge");
+
+    // 判斷是否有編輯權限：(是 Admin) 或 (是 Coach 且正在看自己的表)
+    const canEditThisSchedule = 
+        currentUserRole === 'admin' || 
+        (currentUserRole === 'coach' && currentSelectedCoachId === currentUserProfile.userId);
+
+    if (canEditThisSchedule) {
+        editControls.style.display = "flex";
+        setupEditModeListeners(); // 確保事件綁定
+    } else {
+        editControls.style.display = "none";
+    }
+
+    // 顯示身分徽章
+    if (currentUserRole !== 'user') {
+        roleBadge.style.display = "inline-block";
+        roleBadge.textContent = currentUserRole === 'admin' ? "總教練" : "教練";
+    }
+}
+
 // 核心：從資料庫撈取並渲染網格
 async function fetchAndRenderBookings() {
     renderEmptyTimeGrid(); 
@@ -243,7 +326,8 @@ async function fetchAndRenderBookings() {
     const { data, error } = await supabaseClient
         .from('bookings')
         .select('*')
-        .eq('booking_date', currentSelectedDate);
+        .eq('booking_date', currentSelectedDate)
+        .eq('coach_line_id', currentSelectedCoachId);
 
     if (error) {
         console.error("讀取資料失敗：", error);
@@ -583,6 +667,7 @@ async function handleBookingSubmit(e) {
         status: 'pending', // 預設皆為 pending
         user_line_id: currentUserProfile.userId,
         user_name: currentUserProfile.displayName,
+        coach_line_id: currentSelectedCoachId,
         participants: parseInt(document.getElementById("participants-input").value),
         location: document.getElementById("location-select").value,
         is_first_trial: document.getElementById("first-trial-checkbox").checked,
@@ -857,7 +942,7 @@ async function handleSaveLocks() {
             let timeStr = `${timeId.substring(0,2)}:${timeId.substring(2,4)}`;
             
             if (!currentLock) {
-                currentLock = { booking_date: dateStr, start_time: timeStr, duration_mins: 30, status: 'locked' };
+                currentLock = { booking_date: dateStr, start_time: timeStr, duration_mins: 30, status: 'locked', coach_line_id: currentSelectedCoachId };
             } else {
                 let expectedNextMins = timeToMins(currentLock.start_time) + currentLock.duration_mins;
                 if (timeToMins(timeStr) === expectedNextMins) {
@@ -878,7 +963,8 @@ async function handleSaveLocks() {
         .from('bookings')
         .delete()
         .in('booking_date', datesToDelete)
-        .eq('status', 'locked');
+        .eq('status', 'locked')
+        .eq('coach_line_id', currentSelectedCoachId);
 
     if (deleteError) {
         alert("保存失敗：清除舊資料錯誤");
