@@ -270,7 +270,7 @@ function updateUIByRoleAndCoach() {
 
     const canManageThisSchedule = currentUserIsAdmin || (currentUserIsCoach && currentSelectedCoachId === currentUserProfile.userId);
 
-    if (canEditThisSchedule) {
+    if (canManageThisSchedule) {
         editControls.style.display = "flex";
         setupEditModeListeners(); // 確保事件綁定
     } else {
