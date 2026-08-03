@@ -51,67 +51,19 @@ body {
     font-size: 12px;
 }
 
-/* ================= 教練選擇區塊 ================= */
-.control-bar {
-    padding: 10px 15px 0 15px; /* 上方邊距，可依畫面微調 */
-}
-
-.coach-selector-wrapper {
-    background: #ffffff;
-    padding: 12px 16px;
-    border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+/* ================= 頂部控制列 (並排容器) ================= */
+.top-controls-container {
     display: flex;
-    align-items: center;
-    border: 1.5px solid #e0e0e0;
+    gap: 10px; /* 兩個按鈕之間的間距 */
+    padding: 10px 15px; /* 容器外邊距 */
+    align-items: stretch; /* 讓左右兩個按鈕等高 */
 }
 
-.coach-selector-wrapper .icon {
-    margin-right: 8px;
-    font-size: 16px;
-}
-
-.coach-selector-wrapper label {
-    font-weight: bold;
-    color: #555;
-    margin-right: 10px;
-    font-size: 15px;
-    white-space: nowrap; /* 防止文字換行 */
-}
-
-/* 自訂下拉選單外觀 */
-.custom-select {
-    flex-grow: 1;
-    border: none;
-    background-color: #f0f4f8; /* 帶有一點點藍的淺灰色 */
-    padding: 8px 12px;
-    border-radius: 8px;
-    font-size: 15px;
-    color: #007bff; /* 使用主題藍色 */
-    font-weight: bold;
-    outline: none;
-    cursor: pointer;
-    
-    /* 隱藏原生箭頭，並換上自訂的 SVG 藍色箭頭 */
-    appearance: none; 
-    -webkit-appearance: none;
-    background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23007BFF%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E');
-    background-repeat: no-repeat;
-    background-position: right 12px top 50%;
-    background-size: 12px auto;
-    padding-right: 32px; /* 留空間給 SVG 箭頭 */
-    transition: background-color 0.2s;
-}
-
-.custom-select:active {
-    background-color: #e2e6ea;
-}
-
-/* ================= 頂部日期下壓選單 ================= */
+/* ================= 1. 日期下壓選單 (左側，佔據多數空間) ================= */
 .date-picker-bar {
+    flex-grow: 1; /* 🟢 關鍵：自動佔滿剩下的空間 */
     background: #ffffff;
-    padding: 14px 20px;
-    margin: 10px 15px;
+    padding: 10px 15px;
     border-radius: 12px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.06);
     display: flex;
@@ -120,6 +72,7 @@ body {
     cursor: pointer;
     border: 1.5px solid #007bff;
     transition: background-color 0.2s ease;
+    margin: 0; /* 移除原本的 margin */
 }
 
 .date-picker-bar:active {
@@ -129,23 +82,59 @@ body {
 .date-display {
     display: flex;
     align-items: center;
-    gap: 8px;
-    font-size: 16px;
+    gap: 6px;
 }
 
 .date-display .value {
     font-weight: bold;
     color: #007bff;
-    font-size: 18px;
+    font-size: 16px; /* 稍微縮小字體以適應並排 */
 }
 
 .change-btn {
-    font-size: 13px;
+    font-size: 12px;
     background: #007bff;
     color: white;
-    padding: 6px 12px;
+    padding: 4px 8px;
     border-radius: 20px;
     font-weight: bold;
+}
+
+/* ================= 2. 教練選擇區塊 (右側，短小緊湊) ================= */
+.coach-selector-wrapper {
+    flex-shrink: 0; /* 🟢 關鍵：保證不被擠壓縮水 */
+    background: #ffffff;
+    padding: 8px 12px; /* 縮小內邊距 */
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    display: flex;
+    align-items: center;
+    border: 1.5px solid #e0e0e0;
+}
+
+.coach-selector-wrapper .icon {
+    margin-right: 6px;
+    font-size: 16px;
+}
+
+/* 自訂下拉選單 (精簡版) */
+.custom-select {
+    border: none;
+    background-color: transparent; /* 移除底色讓畫面更乾淨 */
+    padding: 0;
+    font-size: 15px;
+    color: #333;
+    font-weight: bold;
+    outline: none;
+    cursor: pointer;
+    
+    appearance: none; 
+    -webkit-appearance: none;
+    background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23333333%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E');
+    background-repeat: no-repeat;
+    background-position: right 0px top 50%;
+    background-size: 10px auto;
+    padding-right: 16px; /* 留一點點空間給箭頭 */
 }
 
 /* ================= Flatpickr 客製化樣式 ================= */

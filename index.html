@@ -103,25 +103,25 @@
         </div>
     </header>
 
-    <!-- 教練選擇區塊 -->
-    <div class="control-bar">
+    <div class="top-controls-container">
+    
+        <!-- 左側：日期下壓選單 (自動伸展) -->
+        <div id="date-picker-bar" class="date-picker-bar">
+            <div class="date-display">
+                <span class="icon">📅</span>
+                <span id="current-date-text" class="value">載入中...</span>
+            </div>
+            <div class="change-btn">▼</div>
+        </div>
+
+        <!-- 右側：教練選單 (短小緊湊) -->
         <div class="coach-selector-wrapper">
             <span class="icon">👤</span>
-            <label for="coach-selector">預約教練：</label>
             <select id="coach-selector" class="custom-select">
                 <option value="">載入中...</option>
             </select>
         </div>
-    </div>
 
-    <!-- 日期選單 (Date Carousel) -->
-    <div id="date-picker-bar" class="date-picker-bar">
-        <div class="date-display">
-            <span class="icon">📅</span>
-            <span class="label">預約日期：</span>
-            <span id="current-date-text" class="value">載入中...</span>
-        </div>
-        <div class="change-btn">更換日期 ▼</div>
     </div>
 
     <!-- 時間表 (每日 08:00 - 22:00) -->
