@@ -118,6 +118,9 @@ async function finishLogin() {
 
     currentUserRole = roleData ? roleData.role : 'user';
 
+    console.log(currentUserProfile.userId);
+    console.log(currentUserRole);
+
     document.getElementById("user-name").textContent = currentUserProfile.displayName;
     if (currentUserProfile.pictureUrl) document.getElementById("user-avatar").src = currentUserProfile.pictureUrl;
     
