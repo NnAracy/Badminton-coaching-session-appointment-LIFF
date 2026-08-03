@@ -11,6 +11,13 @@ body {
     color: #333;
 }
 
+.custom-icon {
+    width: 16px;
+    height: 16px;
+    object-fit: contain;
+    vertical-align: middle;
+}
+
 /* 頂部導航：固定在最上方 */
 #app-header {
     background-color: #ffffff;
@@ -215,8 +222,8 @@ body {
 }
 
 /* 狀態顏色保持不變 */
-.status-confirmed { background-color: #D4EDDA; color: #155724; } 
-.status-pending { background-color: #FFF3CD; color: #856404; }   
+.status-paid { background-color: #D4EDDA; color: #155724; } 
+.status-unpaid { background-color: #FFF3CD; color: #856404; }   
 .status-completed { background-color: #E2E3E5; color: #383D41; } 
 .status-locked { background-color: #F8D7DA; color: #721C24; }    
 

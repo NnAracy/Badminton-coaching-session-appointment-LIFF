@@ -448,6 +448,7 @@ function openDetailModal(booking) {
     // 🟢 取消按鈕邏輯：現在無論何時，取消按鈕都保持顯示，防呆計算由取消函式內部處理
     cancelBtn.style.display = "block"; 
 
+    let trialHtml = booking.is_first_trial ? `<span class="trial-badge">首次試教</span>` : '';
     // 🟢 狀態文字改為付款判定
     let statusText = booking.status === 'paid' 
         ? '<span style="color:#28a745;font-weight:bold;">已付款</span>' 
