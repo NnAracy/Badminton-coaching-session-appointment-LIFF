@@ -110,33 +110,23 @@ function initializeLiff(myLiffId) {
 }
 
 async function finishLogin() {
-    // 1. 查詢當前使用者的雙重權限
-    const { data: roleData, error } = await supabaseClient
-        .from('user_roles')
-        .select('is_admin, is_coach')
-        .eq('line_id', currentUserProfile.userId)
-        .single();
-
-    if (error) console.warn("讀取權限失敗 (或查無此人):", error);
-
-    if (roleData) {
-        currentUserIsAdmin = roleData.is_admin;
-        currentUserIsCoach = roleData.is_coach;
-    }
-
     document.getElementById("user-name").textContent = currentUserProfile.displayName;
     if (currentUserProfile.pictureUrl) document.getElementById("user-avatar").src = currentUserProfile.pictureUrl;
-    
-    const { data: coaches } = await supabaseClient
-        .from('user_roles')
-        .select('line_id, display_name')
-        .eq('is_coach', true); 
 
-    coachesList = coaches || [];
+    const [roleResult, coachesResult] = await Promise.all([
+        supabaseClient.from('user_roles').select('is_admin, is_coach').eq('line_id', currentUserProfile.userId).single(),
+        supabaseClient.from('user_roles').select('line_id, display_name').eq('is_coach', true)
+    ]);
 
-    // 3. 設定預設顯示的教練
+    if (roleResult.error) console.warn("讀取權限失敗 (或查無此人):", roleResult.error);
+    if (roleResult.data) {
+        currentUserIsAdmin = roleResult.data.is_admin;
+        currentUserIsCoach = roleResult.data.is_coach;
+    }
+
+    coachesList = coachesResult.data || [];
+
     if (coachesList.length > 0) {
-        // 如果自己是教練，預設看自己的表；否則看列表第一位
         if (currentUserIsCoach) {
             currentSelectedCoachId = currentUserProfile.userId;
         } else {
@@ -147,9 +137,17 @@ async function finishLogin() {
     renderCoachSelector();
     updateUIByRoleAndCoach();
     
-    await fetchThirtyDaysLocks(); 
-    initCalendar();
-    fetchAndRenderBookings();
+    if (!currentSelectedDate) {
+        const today = new Date();
+        currentSelectedDate = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+    }
+
+    await Promise.all([
+        fetchThirtyDaysLocks(),
+        fetchAndRenderBookings()
+    ]);
+    
+    initCalendar(); 
 }
 
 // 預先撈取未來 30 天的預約與鎖定資料
@@ -348,7 +346,7 @@ async function fetchAndRenderBookings() {
             title = `我的預約 (${booking.participants}人)`;
             subtitle = booking.location;
         } else {
-            title = booking.status === 'confirmed' ? "已被預約" : "待確定預約";
+            title = "已被預約";
             subtitle = booking.location;
         }
 
@@ -443,29 +441,17 @@ function openDetailModal(booking) {
     
     const contentDiv = document.getElementById("detail-content");
     const cancelBtn = document.getElementById("detail-cancel-btn");
-    const confirmBtn = document.getElementById("detail-confirm-btn");
 
     const canManageThisSchedule = currentUserIsAdmin || (currentUserIsCoach && currentSelectedCoachId === currentUserProfile.userId);
     const isNormalUser = !currentUserIsAdmin && !currentUserIsCoach;
 
-    // 取消按鈕邏輯：學員不能取消 confirmed
-    if (booking.status === 'confirmed' && isNormalUser) {
-        cancelBtn.style.display = "none"; 
-    } else {
-        cancelBtn.style.display = "block";
-    }
+    // 🟢 取消按鈕邏輯：現在無論何時，取消按鈕都保持顯示，防呆計算由取消函式內部處理
+    cancelBtn.style.display = "block"; 
 
-    // 確認按鈕邏輯：只有教練且 pending 才顯示
-    if (canManageThisSchedule && booking.status === 'pending') {
-        confirmBtn.style.display = "block";
-    } else {
-        confirmBtn.style.display = "none";
-    }
-
-    let trialHtml = booking.is_first_trial ? `<span class="trial-badge">首次試教</span>` : '';
-    let statusText = booking.status === 'confirmed' 
-        ? '<span style="color:#28a745;font-weight:bold;">已確定</span>' 
-        : '<span style="color:#ffc107;font-weight:bold;">待確定</span>';
+    // 🟢 狀態文字改為付款判定
+    let statusText = booking.status === 'paid' 
+        ? '<span style="color:#28a745;font-weight:bold;">已付款</span>' 
+        : '<span style="color:#dc3545;font-weight:bold;">未付款</span>';
         
     contentDiv.innerHTML = `
         <p><strong>預約人：</strong> ${booking.user_name} ${trialHtml}</p>
@@ -556,34 +542,6 @@ async function handleCancelBooking() {
     }
 }
 
-// ================= 更新：確定預約 API (教練專用) =================
-async function handleConfirmBooking() {
-    // 教練確認預約時，按鈕改用藍色
-    const isConfirmed = await showCustomConfirm(`確定要接受「${currentDetailBooking.user_name}」的預約嗎？`, "確定接受", "#007bff");
-    
-    if (isConfirmed) {
-        const { error } = await supabaseClient.from('bookings').update({ status: 'confirmed' }).eq('id', currentDetailBooking.id);
-        if (error) {
-            alert("確認失敗，請稍後再試。");
-            console.error(error);
-        } else {
-            document.getElementById("detail-modal").style.display = "none";
-            fetchAndRenderBookings();
-
-            const targetStudentId = currentDetailBooking.user_line_id;
-            const details = [
-                { label: "預約日期", value: currentDetailBooking.booking_date },
-                { label: "預約時間", value: currentDetailBooking.start_time },
-                { label: "時長", value: `${currentDetailBooking.duration_mins} 分鐘` },
-                { label: "地點", value: currentDetailBooking.location }
-            ];
-
-            const flexCard = buildFlexMessage("已確定", "教練已確認預約", "請準時前往上課地點", details, "#00B900");
-            sendLineNotification(targetStudentId, null, flexCard);
-        }
-    }
-}
-
 // ================= Modal 與表單邏輯 =================
 
 function setupModalListeners() {
@@ -598,29 +556,6 @@ function setupModalListeners() {
         document.getElementById("detail-modal").style.display = "none";
     });
     document.getElementById("detail-cancel-btn").addEventListener("click", handleCancelBooking);
-    document.getElementById("detail-confirm-btn").addEventListener("click", handleConfirmBooking);
-
-    // 測試用身份切換
-    // document.getElementById("user-avatar").addEventListener("click", () => {
-    //     avatarClickCount++;
-    //     if (avatarClickCount >= 5) {
-    //         // 連點五次觸發切換
-    //         avatarClickCount = 0; // 歸零
-            
-    //         // 讀取目前的強制狀態，並反轉
-    //         const currentForceRole = sessionStorage.getItem('force_role');
-    //         if (currentForceRole === 'coach') {
-    //             sessionStorage.setItem('force_role', 'student');
-    //             alert("🔄 已切換為【學員視角】，即將重新載入");
-    //         } else {
-    //             sessionStorage.setItem('force_role', 'coach');
-    //             alert("🔄 已切換為【教練視角】，即將重新載入");
-    //         }
-            
-    //         // 重新載入網頁以套用新身分
-    //         window.location.reload();
-    //     }
-    // });
 }
 
 function openBookingModal(timeString) {
@@ -666,7 +601,7 @@ async function handleBookingSubmit(e) {
         booking_date: currentSelectedDate,
         start_time: selectedStartTime,
         duration_mins: durationMins,
-        status: 'pending', // 預設皆為 pending
+        status: 'unpaid',
         user_line_id: currentUserProfile.userId,
         user_name: currentUserProfile.displayName,
         coach_line_id: currentSelectedCoachId,
@@ -694,7 +629,7 @@ async function handleBookingSubmit(e) {
             { label: "地點", value: insertData.location }
         ];
 
-        const flexCard = buildFlexMessage("待確認", "已送出預約申請", "請等待教練確認此時段", details, "#ffc107"); // 黃色提示
+        const flexCard = buildFlexMessage("待確認", "預約已保留", "請在十五分鐘內完成付款", details, "#ffc107"); // 黃色提示
         sendLineNotification(currentUserProfile.userId, null, flexCard);
         await fetchThirtyDaysLocks();
         if (calendarInstance) calendarInstance.redraw();
