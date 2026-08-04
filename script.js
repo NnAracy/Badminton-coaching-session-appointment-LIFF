@@ -26,8 +26,30 @@ let isScrolling = false;
 let draftLocksMap = {};
 let editedDates = new Set();
 
-// 測試用
-// let avatarClickCount = 0;
+const DUMMY_PROFILES = {
+    'u1': { userId: 'u1', displayName: '測試學員 1 (u1)' },
+    'u2': { userId: 'u2', displayName: '測試學員 2 (u2)' },
+    'c1': { userId: 'c1', displayName: '測試教練 1 (c1)' },
+    'c2': { userId: 'c2', displayName: '測試教練 2 (c2)' },
+    'a1': { userId: 'a1', displayName: '測試總教練 (a1)' }
+};
+
+// 綁定切換選單事件
+document.addEventListener("DOMContentLoaded", () => {
+    // ... 原本的 setupModalListeners() 等
+    
+    document.getElementById("dummy-id-selector").addEventListener("change", (e) => {
+        if (!currentUserProfile) return;
+        
+        // 切換時，直接覆寫記憶體中的身分
+        const dummyId = e.target.value;
+        currentUserProfile.userId = DUMMY_PROFILES[dummyId].userId;
+        currentUserProfile.displayName = DUMMY_PROFILES[dummyId].displayName;
+        
+        // 重新執行登入後的全部渲染流程
+        finishLogin(); 
+    });
+});
 
 document.addEventListener("DOMContentLoaded", () => {
     setupModalListeners();
@@ -101,6 +123,12 @@ function initializeLiff(myLiffId) {
             if (liff.isLoggedIn()) {
                 liff.getProfile().then(profile => {
                     currentUserProfile = profile;
+
+                    // 測試用
+                    const dummyId = document.getElementById("dummy-id-selector").value;
+                    currentUserProfile.userId = DUMMY_PROFILES[dummyId].userId;
+                    currentUserProfile.displayName = DUMMY_PROFILES[dummyId].displayName;
+
                     finishLogin();
                 });
             } else {
